@@ -236,12 +236,12 @@ const Maintenance = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="cost">Coût (€)</Label>
+                  <Label htmlFor="cost">Coût (CFA)</Label>
                   <Input
                     id="cost"
                     type="number"
-                    step="0.01"
-                    placeholder="0.00"
+                    step="1"
+                    placeholder="0"
                     value={formData.cost}
                     onChange={(e) => setFormData({ ...formData, cost: e.target.value })}
                     required
@@ -316,7 +316,7 @@ const Maintenance = () => {
             <Wrench className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalCost.toFixed(2)} €</div>
+            <div className="text-2xl font-bold text-foreground">{totalCost.toFixed(0)} CFA</div>
             <p className="text-xs text-muted-foreground">
               {maintenances.length} opérations au total
             </p>
@@ -382,7 +382,7 @@ const Maintenance = () => {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      {Number(maintenance.cost).toFixed(2)} €
+                      {Number(maintenance.cost).toFixed(0)} CFA
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

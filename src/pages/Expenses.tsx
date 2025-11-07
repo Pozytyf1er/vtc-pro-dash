@@ -246,12 +246,12 @@ const Expenses = () => {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="amount">Montant (€)</Label>
+                <Label htmlFor="amount">Montant (CFA)</Label>
                 <Input
                   id="amount"
                   type="number"
-                  step="0.01"
-                  placeholder="0.00"
+                    step="1"
+                    placeholder="0"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   required
@@ -296,7 +296,7 @@ const Expenses = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              {totalAmount.toFixed(2)} €
+              {totalAmount.toFixed(0)} CFA
             </div>
             <p className="text-xs text-muted-foreground">
               {expenses.length} dépenses enregistrées
@@ -317,7 +317,7 @@ const Expenses = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-foreground">
-                  {amount.toFixed(2)} €
+                  {amount.toFixed(0)} CFA
                 </div>
                 <p className="text-xs text-muted-foreground">
                   {((amount / totalAmount) * 100).toFixed(0)}% du total
@@ -355,7 +355,7 @@ const Expenses = () => {
                     </TableCell>
                     <TableCell>{expense.description || "-"}</TableCell>
                     <TableCell className="text-right font-medium text-destructive">
-                      {Number(expense.amount).toFixed(2)} €
+                      {Number(expense.amount).toFixed(0)} CFA
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">

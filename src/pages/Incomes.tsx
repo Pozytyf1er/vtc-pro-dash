@@ -34,8 +34,6 @@ import { format } from "date-fns";
 interface Income {
   id: string;
   date: string;
-  route: string;
-  distance: number;
   amount: number;
   payment_method: string;
   notes?: string;
@@ -50,8 +48,6 @@ const Incomes = () => {
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
-    route: "",
-    distance: "",
     amount: "",
     payment_method: "cash",
     notes: "",
@@ -88,8 +84,6 @@ const Incomes = () => {
         .from("incomes")
         .update({
           date: formData.date,
-          route: formData.route,
-          distance: parseFloat(formData.distance),
           amount: parseFloat(formData.amount),
           payment_method: formData.payment_method,
           notes: formData.notes,
@@ -114,8 +108,6 @@ const Incomes = () => {
       const { error } = await supabase.from("incomes").insert({
         user_id: user?.id,
         date: formData.date,
-        route: formData.route,
-        distance: parseFloat(formData.distance),
         amount: parseFloat(formData.amount),
         payment_method: formData.payment_method,
         notes: formData.notes,
@@ -160,8 +152,6 @@ const Incomes = () => {
     setEditingIncome(income);
     setFormData({
       date: income.date,
-      route: income.route,
-      distance: income.distance.toString(),
       amount: income.amount.toString(),
       payment_method: income.payment_method,
       notes: income.notes || "",
@@ -174,8 +164,6 @@ const Incomes = () => {
     setEditingIncome(null);
     setFormData({
       date: format(new Date(), "yyyy-MM-dd"),
-      route: "",
-      distance: "",
       amount: "",
       payment_method: "cash",
       notes: "",
@@ -183,7 +171,6 @@ const Incomes = () => {
   };
 
   const totalAmount = incomes.reduce((sum, income) => sum + Number(income.amount), 0);
-  const totalDistance = incomes.reduce((sum, income) => sum + Number(income.distance), 0);
 
   if (loading) {
     return (
@@ -225,40 +212,16 @@ const Incomes = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="route">Trajet</Label>
+                <Label htmlFor="amount">Montant (CFA)</Label>
                 <Input
-                  id="route"
-                  placeholder="Ex: Paris - CDG"
-                  value={formData.route}
-                  onChange={(e) => setFormData({ ...formData, route: e.target.value })}
+                  id="amount"
+                  type="number"
+                  step="1"
+                  placeholder="0"
+                  value={formData.amount}
+                  onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   required
                 />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="distance">Distance (km)</Label>
-                  <Input
-                    id="distance"
-                    type="number"
-                    step="0.1"
-                    placeholder="0"
-                    value={formData.distance}
-                    onChange={(e) => setFormData({ ...formData, distance: e.target.value })}
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="amount">Montant (€)</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                    required
-                  />
-                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="payment">Moyen de paiement</Label>
@@ -315,7 +278,7 @@ const Incomes = () => {
             <TrendingUp className="h-4 w-4 text-accent" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-accent">{totalAmount.toFixed(2)} €</div>
+            <div className="text-2xl font-bold text-accent">{totalAmount.toFixed(0)} CFA</div>
             <p className="text-xs text-muted-foreground">{incomes.length} courses enregistrées</p>
           </CardContent>
         </Card>
@@ -323,14 +286,14 @@ const Incomes = () => {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Distance totale
+              Paiements
             </CardTitle>
             <TrendingUp className="h-4 w-4 text-secondary" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{totalDistance.toFixed(1)} km</div>
+            <div className="text-2xl font-bold text-foreground">{incomes.length}</div>
             <p className="text-xs text-muted-foreground">
-              Moyenne: {incomes.length > 0 ? (totalAmount / incomes.length).toFixed(2) : "0.00"} € / course
+              Moyenne: {incomes.length > 0 ? (totalAmount / incomes.length).toFixed(0) : "0"} CFA / course
             </p>
           </CardContent>
         </Card>
@@ -342,17 +305,16 @@ const Incomes = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Date</TableHead>
-                <TableHead>Trajet</TableHead>
-                <TableHead className="text-right">Distance</TableHead>
                 <TableHead className="text-right">Montant</TableHead>
                 <TableHead>Paiement</TableHead>
+                <TableHead>Notes</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {incomes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">
                     Aucune recette enregistrée
                   </TableCell>
                 </TableRow>
@@ -360,12 +322,11 @@ const Incomes = () => {
                 incomes.map((income) => (
                   <TableRow key={income.id}>
                     <TableCell>{format(new Date(income.date), "dd/MM/yyyy")}</TableCell>
-                    <TableCell>{income.route}</TableCell>
-                    <TableCell className="text-right">{income.distance} km</TableCell>
                     <TableCell className="text-right font-medium text-accent">
-                      {Number(income.amount).toFixed(2)} €
+                      {Number(income.amount).toFixed(0)} CFA
                     </TableCell>
                     <TableCell className="capitalize">{income.payment_method}</TableCell>
+                    <TableCell>{income.notes || "-"}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
