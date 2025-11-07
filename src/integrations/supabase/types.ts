@@ -80,7 +80,10 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          last_oil_change_km: number | null
+          next_oil_change_km: number | null
           notes: string | null
+          oil_change_interval: number | null
           status: string
           type: string
           user_id: string
@@ -91,7 +94,10 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          last_oil_change_km?: number | null
+          next_oil_change_km?: number | null
           notes?: string | null
+          oil_change_interval?: number | null
           status?: string
           type: string
           user_id: string
@@ -102,7 +108,10 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          last_oil_change_km?: number | null
+          next_oil_change_km?: number | null
           notes?: string | null
+          oil_change_interval?: number | null
           status?: string
           type?: string
           user_id?: string
@@ -144,6 +153,7 @@ export type Database = {
       }
       vehicles: {
         Row: {
+          assigned_driver: string | null
           created_at: string
           id: string
           insurance_expiry: string | null
@@ -156,6 +166,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          assigned_driver?: string | null
           created_at?: string
           id?: string
           insurance_expiry?: string | null
@@ -168,6 +179,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          assigned_driver?: string | null
           created_at?: string
           id?: string
           insurance_expiry?: string | null

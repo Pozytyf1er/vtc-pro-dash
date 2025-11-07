@@ -5,9 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Car, AlertCircle, CheckCircle } from "lucide-react";
+import { Car, AlertCircle, CheckCircle, Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface Vehicle {
   id: string;
@@ -17,14 +24,16 @@ interface Vehicle {
   next_oil_change?: number;
   insurance_expiry?: string;
   technical_inspection_expiry?: string;
+  assigned_driver?: string;
 }
 
 const Vehicle = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
   const [formData, setFormData] = useState({
     model: "",
     plate_number: "",
@@ -32,37 +41,28 @@ const Vehicle = () => {
     next_oil_change: "",
     insurance_expiry: "",
     technical_inspection_expiry: "",
+    assigned_driver: "",
   });
 
   useEffect(() => {
-    fetchVehicle();
+    fetchVehicles();
   }, [user]);
 
-  const fetchVehicle = async () => {
+  const fetchVehicles = async () => {
     const { data, error } = await supabase
       .from("vehicles")
       .select("*")
       .eq("user_id", user?.id)
-      .maybeSingle();
+      .order("created_at", { ascending: false });
 
-    if (error && error.code !== "PGRST116") {
+    if (error) {
       toast({
         title: "Erreur",
-        description: "Impossible de charger les informations du véhicule",
+        description: "Impossible de charger les véhicules",
         variant: "destructive",
       });
-    } else if (data) {
-      setVehicle(data);
-      setFormData({
-        model: data.model,
-        plate_number: data.plate_number,
-        mileage: data.mileage.toString(),
-        next_oil_change: data.next_oil_change?.toString() || "",
-        insurance_expiry: data.insurance_expiry || "",
-        technical_inspection_expiry: data.technical_inspection_expiry || "",
-      });
     } else {
-      setEditing(true);
+      setVehicles(data || []);
     }
     setLoading(false);
   };
@@ -78,13 +78,14 @@ const Vehicle = () => {
       next_oil_change: formData.next_oil_change ? parseInt(formData.next_oil_change) : null,
       insurance_expiry: formData.insurance_expiry || null,
       technical_inspection_expiry: formData.technical_inspection_expiry || null,
+      assigned_driver: formData.assigned_driver || null,
     };
 
-    if (vehicle) {
+    if (editingVehicle) {
       const { error } = await supabase
         .from("vehicles")
         .update(vehicleData)
-        .eq("id", vehicle.id);
+        .eq("id", editingVehicle.id);
 
       if (error) {
         toast({
@@ -97,8 +98,8 @@ const Vehicle = () => {
           title: "Succès",
           description: "Véhicule modifié avec succès",
         });
-        fetchVehicle();
-        setEditing(false);
+        fetchVehicles();
+        handleCloseDialog();
       }
     } else {
       const { error } = await supabase.from("vehicles").insert(vehicleData);
@@ -114,17 +115,63 @@ const Vehicle = () => {
           title: "Succès",
           description: "Véhicule ajouté avec succès",
         });
-        fetchVehicle();
-        setEditing(false);
+        fetchVehicles();
+        handleCloseDialog();
       }
     }
   };
 
-  const getAlertStatus = (date?: string, km?: number) => {
+  const handleEdit = (vehicle: Vehicle) => {
+    setEditingVehicle(vehicle);
+    setFormData({
+      model: vehicle.model,
+      plate_number: vehicle.plate_number,
+      mileage: vehicle.mileage.toString(),
+      next_oil_change: vehicle.next_oil_change?.toString() || "",
+      insurance_expiry: vehicle.insurance_expiry || "",
+      technical_inspection_expiry: vehicle.technical_inspection_expiry || "",
+      assigned_driver: vehicle.assigned_driver || "",
+    });
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("vehicles").delete().eq("id", id);
+
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le véhicule",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Succès",
+        description: "Véhicule supprimé avec succès",
+      });
+      fetchVehicles();
+    }
+  };
+
+  const handleCloseDialog = () => {
+    setDialogOpen(false);
+    setEditingVehicle(null);
+    setFormData({
+      model: "",
+      plate_number: "",
+      mileage: "",
+      next_oil_change: "",
+      insurance_expiry: "",
+      technical_inspection_expiry: "",
+      assigned_driver: "",
+    });
+  };
+
+  const getAlertStatus = (date?: string, km?: number, vehicleMileage?: number) => {
     if (!date && !km) return null;
 
-    if (km && vehicle) {
-      const remaining = km - vehicle.mileage;
+    if (km && vehicleMileage !== undefined) {
+      const remaining = km - vehicleMileage;
       if (remaining <= 1000) return "error";
       if (remaining <= 3000) return "warning";
       return "ok";
@@ -154,18 +201,26 @@ const Vehicle = () => {
     );
   }
 
-  if (editing || !vehicle) {
-    return (
-      <div className="mx-auto max-w-2xl space-y-6">
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Mon véhicule</h1>
-          <p className="text-muted-foreground">
-            {vehicle ? "Modifier les informations" : "Ajouter votre véhicule"}
-          </p>
+          <h1 className="text-3xl font-bold text-foreground">Mes véhicules</h1>
+          <p className="text-muted-foreground">Gestion de votre flotte</p>
         </div>
-
-        <Card>
-          <CardContent className="pt-6">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => setEditingVehicle(null)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Ajouter un véhicule
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingVehicle ? "Modifier le véhicule" : "Nouveau véhicule"}
+              </DialogTitle>
+            </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="model">Modèle</Label>
@@ -188,6 +243,18 @@ const Vehicle = () => {
                     setFormData({ ...formData, plate_number: e.target.value })
                   }
                   required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="driver">Conducteur assigné</Label>
+                <Input
+                  id="driver"
+                  placeholder="Ex: Jean Dupont"
+                  value={formData.assigned_driver}
+                  onChange={(e) =>
+                    setFormData({ ...formData, assigned_driver: e.target.value })
+                  }
                 />
               </div>
 
@@ -245,127 +312,143 @@ const Vehicle = () => {
 
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1">
-                  {vehicle ? "Modifier" : "Ajouter"}
+                  {editingVehicle ? "Modifier" : "Ajouter"}
                 </Button>
-                {vehicle && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditing(false)}
-                    className="flex-1"
-                  >
-                    Annuler
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCloseDialog}
+                  className="flex-1"
+                >
+                  Annuler
+                </Button>
               </div>
             </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {vehicles.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12">
+            <Car className="h-12 w-12 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground text-center">
+              Aucun véhicule enregistré. Cliquez sur "Ajouter un véhicule" pour commencer.
+            </p>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          {vehicles.map((vehicle) => (
+            <Card key={vehicle.id}>
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <Car className="h-5 w-5" />
+                    <CardTitle>{vehicle.model}</CardTitle>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(vehicle)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(vehicle.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Immatriculation</span>
+                    <span className="font-medium">{vehicle.plate_number}</span>
+                  </div>
+                  {vehicle.assigned_driver && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Conducteur</span>
+                      <span className="font-medium">{vehicle.assigned_driver}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Kilométrage</span>
+                    <span className="font-medium">{vehicle.mileage.toLocaleString()} km</span>
+                  </div>
+                </div>
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Mon véhicule</h1>
-          <p className="text-muted-foreground">Informations et alertes</p>
+                <div className="border-t pt-4 space-y-3">
+                  {vehicle.next_oil_change && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Vidange</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {vehicle.next_oil_change - vehicle.mileage} km restants
+                        </span>
+                        {getAlertStatus(undefined, vehicle.next_oil_change, vehicle.mileage) === "error" && (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        {getAlertStatus(undefined, vehicle.next_oil_change, vehicle.mileage) === "warning" && (
+                          <AlertCircle className="h-4 w-4 text-warning" />
+                        )}
+                        {getAlertStatus(undefined, vehicle.next_oil_change, vehicle.mileage) === "ok" && (
+                          <CheckCircle className="h-4 w-4 text-accent" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {vehicle.insurance_expiry && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Assurance</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {format(new Date(vehicle.insurance_expiry), "dd/MM/yyyy")}
+                        </span>
+                        {getAlertStatus(vehicle.insurance_expiry) === "error" && (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        {getAlertStatus(vehicle.insurance_expiry) === "warning" && (
+                          <AlertCircle className="h-4 w-4 text-warning" />
+                        )}
+                        {getAlertStatus(vehicle.insurance_expiry) === "ok" && (
+                          <CheckCircle className="h-4 w-4 text-accent" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {vehicle.technical_inspection_expiry && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Contrôle technique</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {format(new Date(vehicle.technical_inspection_expiry), "dd/MM/yyyy")}
+                        </span>
+                        {getAlertStatus(vehicle.technical_inspection_expiry) === "error" && (
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                        )}
+                        {getAlertStatus(vehicle.technical_inspection_expiry) === "warning" && (
+                          <AlertCircle className="h-4 w-4 text-warning" />
+                        )}
+                        {getAlertStatus(vehicle.technical_inspection_expiry) === "ok" && (
+                          <CheckCircle className="h-4 w-4 text-accent" />
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
-        <Button onClick={() => setEditing(true)}>Modifier</Button>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Car className="h-5 w-5" />
-              Informations générales
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Modèle</span>
-              <span className="font-medium">{vehicle.model}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Immatriculation</span>
-              <span className="font-medium">{vehicle.plate_number}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Kilométrage</span>
-              <span className="font-medium">{vehicle.mileage.toLocaleString()} km</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Maintenance et contrôles</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {vehicle.next_oil_change && (
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Vidange</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {vehicle.next_oil_change - vehicle.mileage} km restants
-                  </span>
-                  {getAlertStatus(undefined, vehicle.next_oil_change) === "error" && (
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                  )}
-                  {getAlertStatus(undefined, vehicle.next_oil_change) === "warning" && (
-                    <AlertCircle className="h-4 w-4 text-warning" />
-                  )}
-                  {getAlertStatus(undefined, vehicle.next_oil_change) === "ok" && (
-                    <CheckCircle className="h-4 w-4 text-accent" />
-                  )}
-                </div>
-              </div>
-            )}
-
-            {vehicle.insurance_expiry && (
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Assurance</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {format(new Date(vehicle.insurance_expiry), "dd/MM/yyyy")}
-                  </span>
-                  {getAlertStatus(vehicle.insurance_expiry) === "error" && (
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                  )}
-                  {getAlertStatus(vehicle.insurance_expiry) === "warning" && (
-                    <AlertCircle className="h-4 w-4 text-warning" />
-                  )}
-                  {getAlertStatus(vehicle.insurance_expiry) === "ok" && (
-                    <CheckCircle className="h-4 w-4 text-accent" />
-                  )}
-                </div>
-              </div>
-            )}
-
-            {vehicle.technical_inspection_expiry && (
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Contrôle technique</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {format(new Date(vehicle.technical_inspection_expiry), "dd/MM/yyyy")}
-                  </span>
-                  {getAlertStatus(vehicle.technical_inspection_expiry) === "error" && (
-                    <AlertCircle className="h-4 w-4 text-destructive" />
-                  )}
-                  {getAlertStatus(vehicle.technical_inspection_expiry) === "warning" && (
-                    <AlertCircle className="h-4 w-4 text-warning" />
-                  )}
-                  {getAlertStatus(vehicle.technical_inspection_expiry) === "ok" && (
-                    <CheckCircle className="h-4 w-4 text-accent" />
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 };

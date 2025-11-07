@@ -40,12 +40,24 @@ interface Maintenance {
   date: string;
   status: string;
   notes?: string;
+  vehicle_id?: string;
+  last_oil_change_km?: number;
+  oil_change_interval?: number;
+  next_oil_change_km?: number;
+}
+
+interface Vehicle {
+  id: string;
+  model: string;
+  plate_number: string;
+  mileage: number;
 }
 
 const Maintenance = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [maintenances, setMaintenances] = useState<Maintenance[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMaintenance, setEditingMaintenance] = useState<Maintenance | null>(null);
@@ -55,11 +67,32 @@ const Maintenance = () => {
     date: format(new Date(), "yyyy-MM-dd"),
     status: "pending",
     notes: "",
+    vehicle_id: "",
+    last_oil_change_km: "",
+    oil_change_interval: "5000",
   });
 
   useEffect(() => {
+    fetchVehicles();
     fetchMaintenances();
   }, [user]);
+
+  const fetchVehicles = async () => {
+    const { data, error } = await supabase
+      .from("vehicles")
+      .select("*")
+      .eq("user_id", user?.id);
+
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les véhicules",
+        variant: "destructive",
+      });
+    } else {
+      setVehicles(data || []);
+    }
+  };
 
   const fetchMaintenances = async () => {
     const { data, error } = await supabase
@@ -83,6 +116,10 @@ const Maintenance = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const last_oil_km = formData.last_oil_change_km ? parseInt(formData.last_oil_change_km) : null;
+    const interval = formData.oil_change_interval ? parseInt(formData.oil_change_interval) : null;
+    const next_oil_km = last_oil_km && interval ? last_oil_km + interval : null;
+
     if (editingMaintenance) {
       const { error } = await supabase
         .from("maintenance")
@@ -92,6 +129,10 @@ const Maintenance = () => {
           date: formData.date,
           status: formData.status,
           notes: formData.notes,
+          vehicle_id: formData.vehicle_id || null,
+          last_oil_change_km: last_oil_km,
+          oil_change_interval: interval,
+          next_oil_change_km: next_oil_km,
         })
         .eq("id", editingMaintenance.id);
 
@@ -117,6 +158,10 @@ const Maintenance = () => {
         date: formData.date,
         status: formData.status,
         notes: formData.notes,
+        vehicle_id: formData.vehicle_id || null,
+        last_oil_change_km: last_oil_km,
+        oil_change_interval: interval,
+        next_oil_change_km: next_oil_km,
       });
 
       if (error) {
@@ -162,6 +207,9 @@ const Maintenance = () => {
       date: maintenance.date,
       status: maintenance.status,
       notes: maintenance.notes || "",
+      vehicle_id: maintenance.vehicle_id || "",
+      last_oil_change_km: maintenance.last_oil_change_km?.toString() || "",
+      oil_change_interval: maintenance.oil_change_interval?.toString() || "5000",
     });
     setDialogOpen(true);
   };
@@ -175,6 +223,9 @@ const Maintenance = () => {
       date: format(new Date(), "yyyy-MM-dd"),
       status: "pending",
       notes: "",
+      vehicle_id: "",
+      last_oil_change_km: "",
+      oil_change_interval: "5000",
     });
   };
 
@@ -277,6 +328,77 @@ const Maintenance = () => {
                   </SelectContent>
                 </Select>
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vehicle">Véhicule (optionnel)</Label>
+                <Select
+                  value={formData.vehicle_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, vehicle_id: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un véhicule" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehicles.map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.model} - {vehicle.plate_number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {formData.type.toLowerCase().includes("vidange") && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastOilKm">Kilométrage de la dernière vidange</Label>
+                    <Input
+                      id="lastOilKm"
+                      type="number"
+                      placeholder="Ex: 45000"
+                      value={formData.last_oil_change_km}
+                      onChange={(e) =>
+                        setFormData({ ...formData, last_oil_change_km: e.target.value })
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="interval">Intervalle de vidange (km)</Label>
+                    <Select
+                      value={formData.oil_change_interval}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, oil_change_interval: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="5000">5 000 km</SelectItem>
+                        <SelectItem value="10000">10 000 km</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {formData.last_oil_change_km && formData.oil_change_interval && (
+                    <div className="rounded-lg bg-muted p-3">
+                      <p className="text-sm text-muted-foreground">
+                        Prochaine vidange prévue à :{" "}
+                        <span className="font-medium text-foreground">
+                          {(
+                            parseInt(formData.last_oil_change_km) +
+                            parseInt(formData.oil_change_interval)
+                          ).toLocaleString()}{" "}
+                          km
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="notes">Notes (optionnel)</Label>
