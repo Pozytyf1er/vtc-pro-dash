@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
-import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon } from "lucide-react";
+import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
@@ -37,7 +37,8 @@ const Layout = ({ children }: LayoutProps) => {
     { icon: BarChart3, label: "Tableau de bord", path: "/" },
     { icon: TrendingUp, label: "Recettes", path: "/incomes" },
     { icon: TrendingDown, label: "Dépenses", path: "/expenses" },
-    { icon: Car, label: "Véhicule", path: "/vehicle" },
+    { icon: Car, label: "Véhicules", path: "/vehicle" },
+    { icon: Users, label: "Conducteurs", path: "/drivers" },
     { icon: Wrench, label: "Maintenance", path: "/maintenance" },
   ];
 

@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      drivers: {
+        Row: {
+          assigned_vehicle_id: string | null
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          last_name: string
+          license_expiry: string | null
+          license_number: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_vehicle_id?: string | null
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          last_name: string
+          license_expiry?: string | null
+          license_number?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_vehicle_id?: string | null
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          last_name?: string
+          license_expiry?: string | null
+          license_number?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_assigned_vehicle_id_fkey"
+            columns: ["assigned_vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number
@@ -153,7 +203,7 @@ export type Database = {
       }
       vehicles: {
         Row: {
-          assigned_driver: string | null
+          assigned_driver_id: string | null
           created_at: string
           id: string
           insurance_expiry: string | null
@@ -166,7 +216,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          assigned_driver?: string | null
+          assigned_driver_id?: string | null
           created_at?: string
           id?: string
           insurance_expiry?: string | null
@@ -179,7 +229,7 @@ export type Database = {
           user_id: string
         }
         Update: {
-          assigned_driver?: string | null
+          assigned_driver_id?: string | null
           created_at?: string
           id?: string
           insurance_expiry?: string | null
@@ -191,7 +241,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "vehicles_assigned_driver_id_fkey"
+            columns: ["assigned_driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

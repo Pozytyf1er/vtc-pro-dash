@@ -46,6 +46,8 @@ const Incomes = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     amount: "",
@@ -55,14 +57,22 @@ const Incomes = () => {
 
   useEffect(() => {
     fetchIncomes();
-  }, [user]);
+  }, [user, startDate, endDate]);
 
   const fetchIncomes = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("incomes")
       .select("*")
-      .eq("user_id", user?.id)
-      .order("date", { ascending: false });
+      .eq("user_id", user?.id);
+
+    if (startDate) {
+      query = query.gte('date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('date', endDate);
+    }
+
+    const { data, error } = await query.order("date", { ascending: false });
 
     if (error) {
       toast({
@@ -268,6 +278,45 @@ const Incomes = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Filtres par date</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="startDate">Date de début</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="endDate">Date de fin</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                }}
+              >
+                Réinitialiser
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card>

@@ -46,6 +46,8 @@ const Expenses = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     category: "fuel",
@@ -55,14 +57,22 @@ const Expenses = () => {
 
   useEffect(() => {
     fetchExpenses();
-  }, [user]);
+  }, [user, startDate, endDate]);
 
   const fetchExpenses = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("expenses")
       .select("*")
-      .eq("user_id", user?.id)
-      .order("date", { ascending: false });
+      .eq("user_id", user?.id);
+
+    if (startDate) {
+      query = query.gte('date', startDate);
+    }
+    if (endDate) {
+      query = query.lte('date', endDate);
+    }
+
+    const { data, error } = await query.order("date", { ascending: false });
 
     if (error) {
       toast({
@@ -182,6 +192,7 @@ const Expenses = () => {
     insurance: "Assurance",
     parking: "Stationnement",
     tolls: "Péages",
+    yango: "Recharge Yango",
     other: "Autre",
   };
 
@@ -241,6 +252,7 @@ const Expenses = () => {
                     <SelectItem value="insurance">Assurance</SelectItem>
                     <SelectItem value="parking">Stationnement</SelectItem>
                     <SelectItem value="tolls">Péages</SelectItem>
+                    <SelectItem value="yango">Recharge Yango</SelectItem>
                     <SelectItem value="other">Autre</SelectItem>
                   </SelectContent>
                 </Select>
@@ -285,6 +297,45 @@ const Expenses = () => {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Filtres par date</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <Label htmlFor="startDate">Date de début</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="endDate">Date de fin</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+            <div className="flex items-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                }}
+              >
+                Réinitialiser
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Card>

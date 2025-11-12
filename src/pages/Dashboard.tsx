@@ -56,12 +56,11 @@ const Dashboard = () => {
       .eq("user_id", user?.id)
       .gte("date", format(monthStart, "yyyy-MM-dd"));
 
-    // Fetch vehicle for alerts
-    const { data: vehicle } = await supabase
+    // Fetch all vehicles for alerts
+    const { data: vehicles } = await supabase
       .from("vehicles")
       .select("*")
-      .eq("user_id", user?.id)
-      .single();
+      .eq("user_id", user?.id);
 
     // Calculate stats
     const todayIncome = incomes?.filter(
@@ -109,39 +108,41 @@ const Dashboard = () => {
       }));
     setDailyReport(dailyReportData);
 
-    // Check alerts
+    // Check alerts for all vehicles
     const alertsList = [];
-    if (vehicle) {
-      const today = new Date();
-      
-      if (vehicle.next_oil_change && vehicle.mileage >= vehicle.next_oil_change - 1000) {
-        alertsList.push({
-          type: "warning",
-          message: `Vidange proche : ${vehicle.next_oil_change - vehicle.mileage} km restants`,
-        });
-      }
-
-      if (vehicle.insurance_expiry) {
-        const insuranceDate = new Date(vehicle.insurance_expiry);
-        const daysUntilExpiry = Math.ceil((insuranceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntilExpiry <= 30) {
+    if (vehicles && vehicles.length > 0) {
+      vehicles.forEach((vehicle) => {
+        const today = new Date();
+        
+        if (vehicle.next_oil_change && vehicle.mileage >= vehicle.next_oil_change - 1000) {
           alertsList.push({
-            type: daysUntilExpiry <= 7 ? "error" : "warning",
-            message: `Assurance expire dans ${daysUntilExpiry} jours`,
+            type: "warning",
+            message: `Vidange proche pour ${vehicle.model} (${vehicle.plate_number}) : ${vehicle.next_oil_change - vehicle.mileage} km restants`,
           });
         }
-      }
 
-      if (vehicle.technical_inspection_expiry) {
-        const inspectionDate = new Date(vehicle.technical_inspection_expiry);
-        const daysUntilExpiry = Math.ceil((inspectionDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysUntilExpiry <= 30) {
-          alertsList.push({
-            type: daysUntilExpiry <= 7 ? "error" : "warning",
-            message: `Contrôle technique expire dans ${daysUntilExpiry} jours`,
-          });
+        if (vehicle.insurance_expiry) {
+          const insuranceDate = new Date(vehicle.insurance_expiry);
+          const daysUntilExpiry = Math.ceil((insuranceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysUntilExpiry <= 30) {
+            alertsList.push({
+              type: daysUntilExpiry <= 7 ? "error" : "warning",
+              message: `Assurance expire dans ${daysUntilExpiry} jours - ${vehicle.model}`,
+            });
+          }
         }
-      }
+
+        if (vehicle.technical_inspection_expiry) {
+          const inspectionDate = new Date(vehicle.technical_inspection_expiry);
+          const daysUntilExpiry = Math.ceil((inspectionDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysUntilExpiry <= 30) {
+            alertsList.push({
+              type: daysUntilExpiry <= 7 ? "error" : "warning",
+              message: `Contrôle technique expire dans ${daysUntilExpiry} jours - ${vehicle.model}`,
+            });
+          }
+        }
+      });
     }
     setAlerts(alertsList);
     setLoading(false);

@@ -15,6 +15,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface Vehicle {
   id: string;
@@ -24,13 +31,20 @@ interface Vehicle {
   next_oil_change?: number;
   insurance_expiry?: string;
   technical_inspection_expiry?: string;
-  assigned_driver?: string;
+  assigned_driver_id?: string;
+}
+
+interface Driver {
+  id: string;
+  first_name: string;
+  last_name: string;
 }
 
 const Vehicle = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -41,12 +55,25 @@ const Vehicle = () => {
     next_oil_change: "",
     insurance_expiry: "",
     technical_inspection_expiry: "",
-    assigned_driver: "",
+    assigned_driver_id: "",
   });
 
   useEffect(() => {
     fetchVehicles();
+    fetchDrivers();
   }, [user]);
+
+  const fetchDrivers = async () => {
+    const { data, error } = await supabase
+      .from("drivers")
+      .select("id, first_name, last_name")
+      .eq("user_id", user?.id)
+      .order("first_name", { ascending: true });
+
+    if (!error) {
+      setDrivers(data || []);
+    }
+  };
 
   const fetchVehicles = async () => {
     const { data, error } = await supabase
@@ -78,7 +105,7 @@ const Vehicle = () => {
       next_oil_change: formData.next_oil_change ? parseInt(formData.next_oil_change) : null,
       insurance_expiry: formData.insurance_expiry || null,
       technical_inspection_expiry: formData.technical_inspection_expiry || null,
-      assigned_driver: formData.assigned_driver || null,
+      assigned_driver_id: formData.assigned_driver_id || null,
     };
 
     if (editingVehicle) {
@@ -130,7 +157,7 @@ const Vehicle = () => {
       next_oil_change: vehicle.next_oil_change?.toString() || "",
       insurance_expiry: vehicle.insurance_expiry || "",
       technical_inspection_expiry: vehicle.technical_inspection_expiry || "",
-      assigned_driver: vehicle.assigned_driver || "",
+      assigned_driver_id: vehicle.assigned_driver_id || "",
     });
     setDialogOpen(true);
   };
@@ -163,8 +190,14 @@ const Vehicle = () => {
       next_oil_change: "",
       insurance_expiry: "",
       technical_inspection_expiry: "",
-      assigned_driver: "",
+      assigned_driver_id: "",
     });
+  };
+
+  const getDriverName = (driverId?: string) => {
+    if (!driverId) return "Non assigné";
+    const driver = drivers.find(d => d.id === driverId);
+    return driver ? `${driver.first_name} ${driver.last_name}` : "Non assigné";
   };
 
   const getAlertStatus = (date?: string, km?: number, vehicleMileage?: number) => {
@@ -248,14 +281,24 @@ const Vehicle = () => {
 
               <div className="space-y-2">
                 <Label htmlFor="driver">Conducteur assigné</Label>
-                <Input
-                  id="driver"
-                  placeholder="Ex: Jean Dupont"
-                  value={formData.assigned_driver}
-                  onChange={(e) =>
-                    setFormData({ ...formData, assigned_driver: e.target.value })
+                <Select
+                  value={formData.assigned_driver_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, assigned_driver_id: value })
                   }
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un conducteur" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Aucun conducteur</SelectItem>
+                    {drivers.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id}>
+                        {driver.first_name} {driver.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -371,10 +414,10 @@ const Vehicle = () => {
                     <span className="text-muted-foreground">Immatriculation</span>
                     <span className="font-medium">{vehicle.plate_number}</span>
                   </div>
-                  {vehicle.assigned_driver && (
+                  {vehicle.assigned_driver_id && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Conducteur</span>
-                      <span className="font-medium">{vehicle.assigned_driver}</span>
+                      <span className="font-medium">{getDriverName(vehicle.assigned_driver_id)}</span>
                     </div>
                   )}
                   <div className="flex justify-between">
