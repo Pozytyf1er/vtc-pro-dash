@@ -23,7 +23,7 @@ interface StatsData {
   totalFuel: number;
   totalMaintenance: number;
   ordersCount: number;
-  chartData: Array<{ date: string; amount: number }>;
+  chartData: Array<{ date: string; dateLabel?: string; amount: number }>;
 }
 
 const VehicleStats = () => {
@@ -93,19 +93,24 @@ const VehicleStats = () => {
     const endDate = format(end, 'yyyy-MM-dd');
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       // Fetch incomes
       const { data: incomes, error: incomesError } = await supabase
         .from('incomes')
         .select('amount, date')
+        .eq('user_id', user.id)
         .gte('date', startDate)
         .lte('date', endDate);
 
       if (incomesError) throw incomesError;
 
-      // Fetch expenses (recharge + fuel)
+      // Fetch all expenses (not filtered by vehicle)
       const { data: expenses, error: expensesError } = await supabase
         .from('expenses')
         .select('amount, category, date')
+        .eq('user_id', user.id)
         .gte('date', startDate)
         .lte('date', endDate)
         .in('category', ['Recharge Yango', 'Carburant']);
@@ -135,33 +140,20 @@ const VehicleStats = () => {
         const dayRevenue = incomes?.filter(i => i.date === dayStr).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
         
         return {
-          date: period === 'day' ? format(day, 'HH:mm', { locale: fr }) : format(day, 'dd MMM', { locale: fr }),
+          date: format(day, period === 'day' ? 'HH:mm' : 'dd', { locale: fr }),
+          dateLabel: format(day, 'dd MMM', { locale: fr }),
           amount: dayRevenue,
         };
       });
 
-      // For day view, we need hourly data instead
-      if (period === 'day') {
-        // Simplify to show daily total for now
-        const todayRevenue = incomes?.reduce((sum, i) => sum + Number(i.amount), 0) || 0;
-        setStats({
-          totalRevenue,
-          totalRecharge,
-          totalFuel,
-          totalMaintenance,
-          ordersCount: incomes?.length || 0,
-          chartData: [{ date: 'Aujourd\'hui', amount: todayRevenue }],
-        });
-      } else {
-        setStats({
-          totalRevenue,
-          totalRecharge,
-          totalFuel,
-          totalMaintenance,
-          ordersCount: incomes?.length || 0,
-          chartData,
-        });
-      }
+      setStats({
+        totalRevenue,
+        totalRecharge,
+        totalFuel,
+        totalMaintenance,
+        ordersCount: incomes?.length || 0,
+        chartData,
+      });
     } catch (error) {
       console.error('Error fetching stats:', error);
       toast.error("Erreur lors du chargement des statistiques");
@@ -208,21 +200,38 @@ const VehicleStats = () => {
 
       <Card className="mb-6">
         <CardContent className="pt-6">
-          <div className="text-center mb-4">
-            <h1 className="text-5xl font-bold mb-2">{stats.totalRevenue.toLocaleString()} FCFA</h1>
-            <p className="text-muted-foreground text-lg">{stats.ordersCount} commandes</p>
-            <p className="text-sm text-muted-foreground mt-1">{vehicle.model} - {vehicle.plate_number}</p>
+          <div className="text-center mb-6">
+            <h1 className="text-6xl font-bold mb-3">{stats.totalRevenue.toLocaleString()} FCFA</h1>
+            <p className="text-muted-foreground text-xl">{stats.ordersCount} commandes</p>
           </div>
 
           {stats.chartData.length > 0 && (
-            <div className="h-64 mt-8">
+            <div className="h-72 mt-8 mb-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.chartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="amount" fill="hsl(var(--primary))" radius={[8, 8, 0, 0]} />
+                <BarChart data={stats.chartData} barSize={period === 'week' ? 40 : 30}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                  <XAxis 
+                    dataKey={period === 'week' ? 'date' : 'dateLabel'} 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px'
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Bar 
+                    dataKey="amount" 
+                    fill="hsl(var(--primary))" 
+                    radius={[8, 8, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -231,47 +240,33 @@ const VehicleStats = () => {
       </Card>
 
       <div className="space-y-3">
-        <Card className="bg-muted/50">
-          <CardContent className="py-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Recettes</span>
-              <span className="font-semibold text-green-600">{stats.totalRevenue.toLocaleString()} FCFA</span>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="bg-muted/30 rounded-2xl p-4 space-y-3">
+          <div className="flex justify-between items-center py-2">
+            <span className="text-base">Espèces</span>
+            <span className="font-semibold text-lg">{stats.totalRevenue.toLocaleString()} FCFA</span>
+          </div>
 
-        <Card className="bg-muted/50">
-          <CardContent className="py-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Recharges Yango</span>
-              <span className="font-semibold text-red-600">-{stats.totalRecharge.toLocaleString()} FCFA</span>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-base">Commissions de service</span>
+            <span className="font-semibold text-lg">-{stats.totalRecharge.toLocaleString()} FCFA</span>
+          </div>
 
-        <Card className="bg-muted/50">
-          <CardContent className="py-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Carburant</span>
-              <span className="font-semibold text-red-600">-{stats.totalFuel.toLocaleString()} FCFA</span>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-base">Carburant</span>
+            <span className="font-semibold text-lg">-{stats.totalFuel.toLocaleString()} FCFA</span>
+          </div>
 
-        <Card className="bg-muted/50">
-          <CardContent className="py-4">
-            <div className="flex justify-between items-center">
-              <span className="font-medium">Maintenance</span>
-              <span className="font-semibold text-red-600">-{stats.totalMaintenance.toLocaleString()} FCFA</span>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex justify-between items-center py-2">
+            <span className="text-base">Maintenance</span>
+            <span className="font-semibold text-lg">-{stats.totalMaintenance.toLocaleString()} FCFA</span>
+          </div>
+        </div>
 
-        <Card className="bg-primary/10 border-primary">
+        <Card className="bg-primary/10 border-primary mt-4">
           <CardContent className="py-4">
             <div className="flex justify-between items-center">
-              <span className="font-bold">Bénéfice net</span>
-              <span className="font-bold text-primary text-lg">
+              <span className="font-bold text-lg">Bénéfice net</span>
+              <span className="font-bold text-primary text-2xl">
                 {(stats.totalRevenue - stats.totalRecharge - stats.totalFuel - stats.totalMaintenance).toLocaleString()} FCFA
               </span>
             </div>
