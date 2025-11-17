@@ -12,6 +12,7 @@ import Incomes from "./pages/Incomes";
 import Expenses from "./pages/Expenses";
 import Vehicle from "./pages/Vehicle";
 import Drivers from "./pages/Drivers";
+import VehicleStats from "./pages/VehicleStats";
 import Maintenance from "./pages/Maintenance";
 import NotFound from "./pages/NotFound";
 
@@ -62,6 +63,16 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Vehicle />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vehicle/:vehicleId/stats"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <VehicleStats />
                   </Layout>
                 </ProtectedRoute>
               }
