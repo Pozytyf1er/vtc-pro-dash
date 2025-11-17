@@ -281,14 +281,13 @@ const Drivers = () => {
               <div>
                 <Label htmlFor="assigned_vehicle_id">Véhicule assigné</Label>
                 <Select
-                  value={formData.assigned_vehicle_id}
+                  value={formData.assigned_vehicle_id || undefined}
                   onValueChange={(value) => setFormData({ ...formData, assigned_vehicle_id: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionner un véhicule" />
+                    <SelectValue placeholder="Aucun véhicule" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Aucun véhicule</SelectItem>
                     {vehicles.map((vehicle) => (
                       <SelectItem key={vehicle.id} value={vehicle.id}>
                         {vehicle.model} ({vehicle.plate_number})
