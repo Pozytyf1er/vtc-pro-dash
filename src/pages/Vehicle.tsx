@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ interface Driver {
 const Vehicle = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
@@ -483,13 +485,21 @@ const Vehicle = () => {
                           <CheckCircle className="h-4 w-4 text-accent" />
                         )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                     </div>
+                   )}
+                 </div>
+
+                <Button 
+                  className="w-full mt-4" 
+                  variant="outline"
+                  onClick={() => navigate(`/vehicle/${vehicle.id}/stats`)}
+                >
+                  Voir les statistiques
+                </Button>
+               </CardContent>
+             </Card>
+           ))}
+         </div>
       )}
     </div>
   );
