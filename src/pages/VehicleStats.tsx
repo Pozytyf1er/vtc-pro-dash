@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { startOfDay, startOfWeek, startOfMonth, endOfDay, endOfWeek, endOfMonth, eachDayOfInterval, format } from "date-fns";
@@ -23,7 +24,15 @@ interface StatsData {
   totalFuel: number;
   totalMaintenance: number;
   ordersCount: number;
-  chartData: Array<{ date: string; dateLabel?: string; amount: number }>;
+  chartData: Array<{ 
+    date: string; 
+    dateLabel?: string; 
+    fullDate: string;
+    amount: number;
+    recharge: number;
+    fuel: number;
+    maintenance: number;
+  }>;
 }
 
 const VehicleStats = () => {
@@ -40,6 +49,14 @@ const VehicleStats = () => {
     chartData: [],
   });
   const [loading, setLoading] = useState(true);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedDayData, setSelectedDayData] = useState<{
+    date: string;
+    revenue: number;
+    recharge: number;
+    fuel: number;
+    maintenance: number;
+  } | null>(null);
 
   useEffect(() => {
     if (vehicleId) {
@@ -138,11 +155,18 @@ const VehicleStats = () => {
       const chartData = days.map(day => {
         const dayStr = format(day, 'yyyy-MM-dd');
         const dayRevenue = incomes?.filter(i => i.date === dayStr).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+        const dayRecharge = expenses?.filter(e => e.date === dayStr && e.category === 'Recharge Yango').reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+        const dayFuel = expenses?.filter(e => e.date === dayStr && e.category === 'Carburant').reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+        const dayMaintenance = maintenance?.filter(m => m.date === dayStr).reduce((sum, m) => sum + Number(m.cost), 0) || 0;
         
         return {
           date: format(day, period === 'day' ? 'HH:mm' : 'dd', { locale: fr }),
           dateLabel: format(day, 'dd MMM', { locale: fr }),
+          fullDate: dayStr,
           amount: dayRevenue,
+          recharge: dayRecharge,
+          fuel: dayFuel,
+          maintenance: dayMaintenance,
         };
       });
 
@@ -162,9 +186,19 @@ const VehicleStats = () => {
     }
   };
 
-  if (loading || !vehicle) {
-    return <div className="flex justify-center items-center h-screen">Chargement...</div>;
-  }
+  const handleBarClick = (data: any) => {
+    if (data && data.activePayload && data.activePayload[0]) {
+      const clickedData = data.activePayload[0].payload;
+      setSelectedDayData({
+        date: clickedData.dateLabel || clickedData.date,
+        revenue: clickedData.amount,
+        recharge: clickedData.recharge,
+        fuel: clickedData.fuel,
+        maintenance: clickedData.maintenance,
+      });
+      setDetailsDialogOpen(true);
+    }
+  };
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
@@ -208,7 +242,7 @@ const VehicleStats = () => {
           {stats.chartData.length > 0 && (
             <div className="h-72 mt-8 mb-4">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={stats.chartData} barSize={period === 'week' ? 40 : 30}>
+                <BarChart data={stats.chartData} barSize={period === 'week' ? 40 : 30} onClick={handleBarClick}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
                   <XAxis 
                     dataKey={period === 'week' ? 'date' : 'dateLabel'} 
@@ -231,6 +265,7 @@ const VehicleStats = () => {
                     dataKey="amount" 
                     fill="hsl(var(--primary))" 
                     radius={[8, 8, 0, 0]}
+                    cursor="pointer"
                   />
                 </BarChart>
               </ResponsiveContainer>
@@ -273,6 +308,64 @@ const VehicleStats = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Détails - {selectedDayData?.date}</DialogTitle>
+          </DialogHeader>
+          {selectedDayData && (
+            <div className="space-y-4">
+              <div className="bg-green-50 dark:bg-green-950/30 rounded-xl p-4">
+                <div className="text-sm text-muted-foreground mb-1">Recette</div>
+                <div className="text-2xl font-bold text-green-600">
+                  {selectedDayData.revenue.toLocaleString()} FCFA
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-muted-foreground">Dépenses</h3>
+                
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Commissions</span>
+                    <span className="font-semibold text-red-600">
+                      -{selectedDayData.recharge.toLocaleString()} FCFA
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Carburant</span>
+                    <span className="font-semibold text-red-600">
+                      -{selectedDayData.fuel.toLocaleString()} FCFA
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Maintenance</span>
+                    <span className="font-semibold text-red-600">
+                      -{selectedDayData.maintenance.toLocaleString()} FCFA
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold">Bénéfice</span>
+                  <span className="font-bold text-xl text-primary">
+                    {(selectedDayData.revenue - selectedDayData.recharge - selectedDayData.fuel - selectedDayData.maintenance).toLocaleString()} FCFA
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
