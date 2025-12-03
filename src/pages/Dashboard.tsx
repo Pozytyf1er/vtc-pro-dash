@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, DollarSign, AlertTriangle, Filter, X } from "lucide-react";
+import { TrendingUp, DollarSign, AlertTriangle, Filter } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, startOfMonth, endOfMonth, startOfWeek, subDays } from "date-fns";
+import { format, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Select,
@@ -23,7 +23,6 @@ import {
 interface ExpenseDetail {
   category: string;
   amount: number;
-  description?: string;
 }
 
 interface DetailData {
@@ -59,26 +58,51 @@ const Dashboard = () => {
     if (user) {
       fetchDashboardData();
     }
-  }, [user]);
+  }, [user, filterPeriod]);
+
+  const getStartDateForPeriod = (period: string): Date => {
+    const today = new Date();
+    switch (period) {
+      case "7":
+        return subDays(today, 7);
+      case "14":
+        return subDays(today, 14);
+      case "30":
+        return subDays(today, 30);
+      case "90":
+        return subMonths(today, 3);
+      case "180":
+        return subMonths(today, 6);
+      case "365":
+        return subMonths(today, 12);
+      default:
+        return subDays(today, 7);
+    }
+  };
 
   const fetchDashboardData = async () => {
     const today = new Date();
     const weekStart = startOfWeek(today, { locale: fr });
     const monthStart = startOfMonth(today);
+    const periodStart = getStartDateForPeriod(filterPeriod);
 
-    // Fetch incomes
+    // Fetch incomes for the selected period (use the earliest date needed)
+    const earliestDate = periodStart < monthStart ? periodStart : monthStart;
+    
     const { data: incomes } = await supabase
       .from("incomes")
       .select("*")
       .eq("user_id", user?.id)
-      .gte("date", format(monthStart, "yyyy-MM-dd"));
+      .gte("date", format(earliestDate, "yyyy-MM-dd"))
+      .order("date", { ascending: false });
 
-    // Fetch expenses
+    // Fetch expenses for the selected period
     const { data: expenses } = await supabase
       .from("expenses")
       .select("*")
       .eq("user_id", user?.id)
-      .gte("date", format(monthStart, "yyyy-MM-dd"));
+      .gte("date", format(earliestDate, "yyyy-MM-dd"))
+      .order("date", { ascending: false });
 
     // Fetch all vehicles for alerts
     const { data: vehicles } = await supabase
@@ -90,16 +114,22 @@ const Dashboard = () => {
     setAllExpenses(expenses || []);
 
     // Calculate stats
+    const todayStr = format(today, "yyyy-MM-dd");
     const todayIncome = incomes?.filter(
-      (i) => i.date === format(today, "yyyy-MM-dd")
+      (i) => i.date === todayStr
     ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
 
     const weekIncome = incomes?.filter(
       (i) => new Date(i.date) >= weekStart
     ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
 
-    const monthIncome = incomes?.reduce((sum, i) => sum + Number(i.amount), 0) || 0;
-    const monthExpenses = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    const monthIncome = incomes?.filter(
+      (i) => new Date(i.date) >= monthStart
+    ).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
+    
+    const monthExpenses = expenses?.filter(
+      (e) => new Date(e.date) >= monthStart
+    ).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
 
     setStats({
       todayIncome,
@@ -109,18 +139,20 @@ const Dashboard = () => {
       netProfit: monthIncome - monthExpenses,
     });
 
-    // Generate chart data
-    generateChartData(today, incomes || [], expenses || [], parseInt(filterPeriod));
+    // Generate chart data based on selected period
+    const periodIncomes = incomes?.filter(i => new Date(i.date) >= periodStart) || [];
+    const periodExpenses = expenses?.filter(e => new Date(e.date) >= periodStart) || [];
+    generateChartData(today, periodIncomes, periodExpenses, parseInt(filterPeriod));
 
-    // Generate daily report with all dates that have expenses or incomes
+    // Generate daily report for the selected period
     const dailyMap = new Map();
-    incomes?.forEach((inc) => {
+    periodIncomes.forEach((inc) => {
       if (!dailyMap.has(inc.date)) {
         dailyMap.set(inc.date, { date: inc.date, recettes: 0, dépenses: 0 });
       }
       dailyMap.get(inc.date).recettes += Number(inc.amount);
     });
-    expenses?.forEach((exp) => {
+    periodExpenses.forEach((exp) => {
       if (!dailyMap.has(exp.date)) {
         dailyMap.set(exp.date, { date: exp.date, recettes: 0, dépenses: 0 });
       }
@@ -139,7 +171,7 @@ const Dashboard = () => {
     const alertsList: any[] = [];
     if (vehicles && vehicles.length > 0) {
       vehicles.forEach((vehicle) => {
-        const today = new Date();
+        const todayDate = new Date();
         
         if (vehicle.next_oil_change && vehicle.mileage >= vehicle.next_oil_change - 1000) {
           alertsList.push({
@@ -150,7 +182,7 @@ const Dashboard = () => {
 
         if (vehicle.insurance_expiry) {
           const insuranceDate = new Date(vehicle.insurance_expiry);
-          const daysUntilExpiry = Math.ceil((insuranceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const daysUntilExpiry = Math.ceil((insuranceDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
           if (daysUntilExpiry <= 30) {
             alertsList.push({
               type: daysUntilExpiry <= 7 ? "error" : "warning",
@@ -161,7 +193,7 @@ const Dashboard = () => {
 
         if (vehicle.technical_inspection_expiry) {
           const inspectionDate = new Date(vehicle.technical_inspection_expiry);
-          const daysUntilExpiry = Math.ceil((inspectionDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+          const daysUntilExpiry = Math.ceil((inspectionDate.getTime() - todayDate.getTime()) / (1000 * 60 * 60 * 24));
           if (daysUntilExpiry <= 30) {
             alertsList.push({
               type: daysUntilExpiry <= 7 ? "error" : "warning",
@@ -177,26 +209,48 @@ const Dashboard = () => {
 
   const generateChartData = (today: Date, incomes: any[], expenses: any[], days: number) => {
     const data = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const date = subDays(today, i);
-      const dateStr = format(date, "yyyy-MM-dd");
-      const dayIncomes = incomes?.filter((inc) => inc.date === dateStr).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
-      const dayExpenses = expenses?.filter((exp) => exp.date === dateStr).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-      
-      data.push({
-        date: format(date, "dd MMM", { locale: fr }),
-        recettes: dayIncomes,
-        dépenses: dayExpenses,
-      });
+    
+    // For longer periods, aggregate by week or month
+    if (days > 60) {
+      // Aggregate by week for 3+ months
+      const weeksCount = Math.ceil(days / 7);
+      for (let i = weeksCount - 1; i >= 0; i--) {
+        const weekEnd = subDays(today, i * 7);
+        const weekStart = subDays(weekEnd, 6);
+        
+        const weekIncomes = incomes.filter((inc) => {
+          const d = new Date(inc.date);
+          return d >= weekStart && d <= weekEnd;
+        }).reduce((sum, inc) => sum + Number(inc.amount), 0);
+        
+        const weekExpenses = expenses.filter((exp) => {
+          const d = new Date(exp.date);
+          return d >= weekStart && d <= weekEnd;
+        }).reduce((sum, exp) => sum + Number(exp.amount), 0);
+        
+        data.push({
+          date: format(weekStart, "dd MMM", { locale: fr }),
+          recettes: weekIncomes,
+          dépenses: weekExpenses,
+        });
+      }
+    } else {
+      // Daily for shorter periods
+      for (let i = days - 1; i >= 0; i--) {
+        const date = subDays(today, i);
+        const dateStr = format(date, "yyyy-MM-dd");
+        const dayIncomes = incomes.filter((inc) => inc.date === dateStr).reduce((sum, i) => sum + Number(i.amount), 0);
+        const dayExpenses = expenses.filter((exp) => exp.date === dateStr).reduce((sum, e) => sum + Number(e.amount), 0);
+        
+        data.push({
+          date: format(date, "dd MMM", { locale: fr }),
+          recettes: dayIncomes,
+          dépenses: dayExpenses,
+        });
+      }
     }
     setChartData(data);
   };
-
-  useEffect(() => {
-    if (user) {
-      fetchDashboardData();
-    }
-  }, [filterPeriod]);
 
   const openDetailDialog = (type: 'today' | 'week' | 'month') => {
     const today = new Date();
@@ -253,6 +307,25 @@ const Dashboard = () => {
     });
     setDetailDialogOpen(true);
   };
+
+  const getPeriodLabel = (period: string): string => {
+    switch (period) {
+      case "7": return "7 derniers jours";
+      case "14": return "14 derniers jours";
+      case "30": return "30 derniers jours";
+      case "90": return "3 derniers mois";
+      case "180": return "6 derniers mois";
+      case "365": return "Cette année";
+      default: return "7 derniers jours";
+    }
+  };
+
+  // Calculate period totals for display
+  const periodStart = getStartDateForPeriod(filterPeriod);
+  const periodIncomes = allIncomes.filter(i => new Date(i.date) >= periodStart);
+  const periodExpenses = allExpenses.filter(e => new Date(e.date) >= periodStart);
+  const periodTotalIncome = periodIncomes.reduce((sum, i) => sum + Number(i.amount), 0);
+  const periodTotalExpenses = periodExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
   if (loading) {
     return (
@@ -439,8 +512,34 @@ const Dashboard = () => {
               <SelectItem value="7">7 derniers jours</SelectItem>
               <SelectItem value="14">14 derniers jours</SelectItem>
               <SelectItem value="30">30 derniers jours</SelectItem>
+              <SelectItem value="90">3 derniers mois</SelectItem>
+              <SelectItem value="180">6 derniers mois</SelectItem>
+              <SelectItem value="365">Cette année</SelectItem>
             </SelectContent>
           </Select>
+          
+          {/* Period summary */}
+          <div className="mt-4 p-4 rounded-lg bg-muted/50 border">
+            <p className="text-sm font-medium text-muted-foreground mb-2">
+              Résumé - {getPeriodLabel(filterPeriod)}
+            </p>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-lg font-bold text-accent">{periodTotalIncome.toFixed(0)}</p>
+                <p className="text-xs text-muted-foreground">Recettes (CFA)</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-destructive">{periodTotalExpenses.toFixed(0)}</p>
+                <p className="text-xs text-muted-foreground">Dépenses (CFA)</p>
+              </div>
+              <div>
+                <p className={`text-lg font-bold ${periodTotalIncome - periodTotalExpenses >= 0 ? 'text-accent' : 'text-destructive'}`}>
+                  {(periodTotalIncome - periodTotalExpenses).toFixed(0)}
+                </p>
+                <p className="text-xs text-muted-foreground">Bénéfice (CFA)</p>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -448,7 +547,7 @@ const Dashboard = () => {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Évolution sur {filterPeriod} jours</CardTitle>
+            <CardTitle>Évolution - {getPeriodLabel(filterPeriod)}</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -500,35 +599,41 @@ const Dashboard = () => {
       {/* Daily Report */}
       <Card>
         <CardHeader>
-          <CardTitle>Rapport journalier détaillé</CardTitle>
+          <CardTitle>Rapport détaillé - {getPeriodLabel(filterPeriod)}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {dailyReport.slice(0, 10).map((day) => (
-              <div 
-                key={day.date} 
-                className={`flex items-center justify-between p-4 rounded-lg border ${
-                  day.dépenses > day.recettes ? 'bg-destructive/5 border-destructive/20' : 'bg-accent/5 border-accent/20'
-                }`}
-              >
-                <div className="flex-1">
-                  <p className="font-semibold text-foreground">
-                    {format(new Date(day.date), "dd MMMM yyyy", { locale: fr })}
-                  </p>
-                  <div className="flex gap-4 mt-1 text-sm">
-                    <span className="text-accent">
-                      Recettes: {day.recettes.toFixed(0)} CFA
-                    </span>
-                    <span className="text-destructive">
-                      Dépenses: {day.dépenses.toFixed(0)} CFA
-                    </span>
+          <div className="space-y-3 max-h-[500px] overflow-y-auto">
+            {dailyReport.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Aucune donnée pour cette période
+              </p>
+            ) : (
+              dailyReport.map((day) => (
+                <div 
+                  key={day.date} 
+                  className={`flex items-center justify-between p-4 rounded-lg border ${
+                    day.dépenses > day.recettes ? 'bg-destructive/5 border-destructive/20' : 'bg-accent/5 border-accent/20'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <p className="font-semibold text-foreground">
+                      {format(new Date(day.date), "EEEE dd MMMM yyyy", { locale: fr })}
+                    </p>
+                    <div className="flex gap-4 mt-1 text-sm">
+                      <span className="text-accent">
+                        Recettes: {day.recettes.toFixed(0)} CFA
+                      </span>
+                      <span className="text-destructive">
+                        Dépenses: {day.dépenses.toFixed(0)} CFA
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`text-lg font-bold ${day.net >= 0 ? 'text-accent' : 'text-destructive'}`}>
+                    {day.net >= 0 ? '+' : ''}{day.net.toFixed(0)} CFA
                   </div>
                 </div>
-                <div className={`text-lg font-bold ${day.net >= 0 ? 'text-accent' : 'text-destructive'}`}>
-                  {day.net >= 0 ? '+' : ''}{day.net.toFixed(0)} CFA
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
