@@ -151,7 +151,7 @@ const Maintenance = () => {
         handleCloseDialog();
       }
     } else {
-      const { error } = await supabase.from("maintenance").insert({
+      const { data: maintenanceData, error } = await supabase.from("maintenance").insert({
         user_id: user?.id,
         type: formData.type,
         cost: parseFloat(formData.cost),
@@ -162,7 +162,7 @@ const Maintenance = () => {
         last_oil_change_km: last_oil_km,
         oil_change_interval: interval,
         next_oil_change_km: next_oil_km,
-      });
+      }).select();
 
       if (error) {
         toast({
@@ -171,9 +171,21 @@ const Maintenance = () => {
           variant: "destructive",
         });
       } else {
+        // Auto-add to expenses
+        const cost = parseFloat(formData.cost);
+        if (cost > 0) {
+          await supabase.from("expenses").insert({
+            user_id: user?.id,
+            amount: cost,
+            category: "Maintenance",
+            date: formData.date,
+            description: `Maintenance: ${formData.type}`,
+          });
+        }
+        
         toast({
           title: "Succès",
-          description: "Maintenance ajoutée avec succès",
+          description: "Maintenance ajoutée avec succès (dépense créée automatiquement)",
         });
         fetchMaintenances();
         handleCloseDialog();
