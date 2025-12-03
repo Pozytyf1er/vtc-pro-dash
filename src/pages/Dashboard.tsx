@@ -2,10 +2,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { TrendingUp, TrendingDown, DollarSign, AlertTriangle, Filter } from "lucide-react";
+import { TrendingUp, DollarSign, AlertTriangle, Filter, X } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, subDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, subDays } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   Select,
@@ -14,6 +13,28 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+interface ExpenseDetail {
+  category: string;
+  amount: number;
+  description?: string;
+}
+
+interface DetailData {
+  title: string;
+  period: string;
+  revenue: number;
+  expenses: ExpenseDetail[];
+  totalExpenses: number;
+  profit: number;
+  expensePercentage: number;
+}
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -29,6 +50,10 @@ const Dashboard = () => {
   const [dailyReport, setDailyReport] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterPeriod, setFilterPeriod] = useState("7");
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [detailData, setDetailData] = useState<DetailData | null>(null);
+  const [allIncomes, setAllIncomes] = useState<any[]>([]);
+  const [allExpenses, setAllExpenses] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -40,7 +65,6 @@ const Dashboard = () => {
     const today = new Date();
     const weekStart = startOfWeek(today, { locale: fr });
     const monthStart = startOfMonth(today);
-    const monthEnd = endOfMonth(today);
 
     // Fetch incomes
     const { data: incomes } = await supabase
@@ -61,6 +85,9 @@ const Dashboard = () => {
       .from("vehicles")
       .select("*")
       .eq("user_id", user?.id);
+
+    setAllIncomes(incomes || []);
+    setAllExpenses(expenses || []);
 
     // Calculate stats
     const todayIncome = incomes?.filter(
@@ -83,7 +110,7 @@ const Dashboard = () => {
     });
 
     // Generate chart data
-    generateChartData(today, incomes, expenses, parseInt(filterPeriod));
+    generateChartData(today, incomes || [], expenses || [], parseInt(filterPeriod));
 
     // Generate daily report with all dates that have expenses or incomes
     const dailyMap = new Map();
@@ -109,7 +136,7 @@ const Dashboard = () => {
     setDailyReport(dailyReportData);
 
     // Check alerts for all vehicles
-    const alertsList = [];
+    const alertsList: any[] = [];
     if (vehicles && vehicles.length > 0) {
       vehicles.forEach((vehicle) => {
         const today = new Date();
@@ -149,20 +176,20 @@ const Dashboard = () => {
   };
 
   const generateChartData = (today: Date, incomes: any[], expenses: any[], days: number) => {
-    const chartData = [];
+    const data = [];
     for (let i = days - 1; i >= 0; i--) {
       const date = subDays(today, i);
       const dateStr = format(date, "yyyy-MM-dd");
       const dayIncomes = incomes?.filter((inc) => inc.date === dateStr).reduce((sum, i) => sum + Number(i.amount), 0) || 0;
       const dayExpenses = expenses?.filter((exp) => exp.date === dateStr).reduce((sum, e) => sum + Number(e.amount), 0) || 0;
       
-      chartData.push({
+      data.push({
         date: format(date, "dd MMM", { locale: fr }),
         recettes: dayIncomes,
         dépenses: dayExpenses,
       });
     }
-    setChartData(chartData);
+    setChartData(data);
   };
 
   useEffect(() => {
@@ -170,6 +197,62 @@ const Dashboard = () => {
       fetchDashboardData();
     }
   }, [filterPeriod]);
+
+  const openDetailDialog = (type: 'today' | 'week' | 'month') => {
+    const today = new Date();
+    let title = '';
+    let period = '';
+    let filteredIncomes: any[] = [];
+    let filteredExpenses: any[] = [];
+
+    if (type === 'today') {
+      const todayStr = format(today, "yyyy-MM-dd");
+      title = "Détails du jour";
+      period = format(today, "dd MMMM yyyy", { locale: fr });
+      filteredIncomes = allIncomes.filter(i => i.date === todayStr);
+      filteredExpenses = allExpenses.filter(e => e.date === todayStr);
+    } else if (type === 'week') {
+      const weekStart = startOfWeek(today, { locale: fr });
+      title = "Détails de la semaine";
+      period = `${format(weekStart, "dd MMM", { locale: fr })} - ${format(today, "dd MMM yyyy", { locale: fr })}`;
+      filteredIncomes = allIncomes.filter(i => new Date(i.date) >= weekStart);
+      filteredExpenses = allExpenses.filter(e => new Date(e.date) >= weekStart);
+    } else {
+      const monthStart = startOfMonth(today);
+      title = "Détails du mois";
+      period = format(today, "MMMM yyyy", { locale: fr });
+      filteredIncomes = allIncomes.filter(i => new Date(i.date) >= monthStart);
+      filteredExpenses = allExpenses.filter(e => new Date(e.date) >= monthStart);
+    }
+
+    const revenue = filteredIncomes.reduce((sum, i) => sum + Number(i.amount), 0);
+    
+    // Group expenses by category
+    const expensesByCategory = filteredExpenses.reduce((acc: Record<string, ExpenseDetail>, exp) => {
+      const cat = exp.category || 'Autre';
+      if (!acc[cat]) {
+        acc[cat] = { category: cat, amount: 0 };
+      }
+      acc[cat].amount += Number(exp.amount);
+      return acc;
+    }, {});
+    
+    const expenseDetails: ExpenseDetail[] = Object.values(expensesByCategory);
+    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const profit = revenue - totalExpenses;
+    const expensePercentage = revenue > 0 ? (totalExpenses / revenue) * 100 : 0;
+
+    setDetailData({
+      title,
+      period,
+      revenue,
+      expenses: expenseDetails,
+      totalExpenses,
+      profit,
+      expensePercentage,
+    });
+    setDetailDialogOpen(true);
+  };
 
   if (loading) {
     return (
@@ -204,9 +287,12 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Clickable */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card 
+          className="cursor-pointer transition-all hover:shadow-lg hover:border-accent"
+          onClick={() => openDetailDialog('today')}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Aujourd'hui
@@ -215,11 +301,14 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{stats.todayIncome.toFixed(0)} CFA</div>
-            <p className="text-xs text-muted-foreground">Recettes du jour</p>
+            <p className="text-xs text-muted-foreground">Cliquez pour voir les détails</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className="cursor-pointer transition-all hover:shadow-lg hover:border-accent"
+          onClick={() => openDetailDialog('week')}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Cette semaine
@@ -228,11 +317,14 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{stats.weekIncome.toFixed(0)} CFA</div>
-            <p className="text-xs text-muted-foreground">Recettes hebdomadaires</p>
+            <p className="text-xs text-muted-foreground">Cliquez pour voir les détails</p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className="cursor-pointer transition-all hover:shadow-lg hover:border-accent"
+          onClick={() => openDetailDialog('month')}
+        >
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Ce mois
@@ -241,7 +333,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{stats.monthIncome.toFixed(0)} CFA</div>
-            <p className="text-xs text-muted-foreground">Recettes mensuelles</p>
+            <p className="text-xs text-muted-foreground">Cliquez pour voir les détails</p>
           </CardContent>
         </Card>
 
@@ -262,6 +354,73 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Detail Dialog */}
+      <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{detailData?.title}</DialogTitle>
+          </DialogHeader>
+          {detailData && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground text-center font-medium">
+                {detailData.period}
+              </p>
+
+              {/* Revenue */}
+              <div className="p-4 rounded-lg bg-accent/10 border border-accent/20">
+                <p className="text-sm text-muted-foreground">Chiffre d'affaires</p>
+                <p className="text-2xl font-bold text-accent">{detailData.revenue.toFixed(0)} CFA</p>
+              </div>
+
+              {/* Expenses by category */}
+              <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                <p className="text-sm text-muted-foreground mb-3">Dépenses par catégorie</p>
+                {detailData.expenses.length > 0 ? (
+                  <div className="space-y-2">
+                    {detailData.expenses.map((exp, idx) => (
+                      <div key={idx} className="flex justify-between items-center">
+                        <span className="text-sm">{exp.category}</span>
+                        <span className="font-medium text-destructive">{exp.amount.toFixed(0)} CFA</span>
+                      </div>
+                    ))}
+                    <div className="border-t border-destructive/20 pt-2 mt-2">
+                      <div className="flex justify-between items-center font-bold">
+                        <span>Total dépenses</span>
+                        <span className="text-destructive">{detailData.totalExpenses.toFixed(0)} CFA</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Aucune dépense</p>
+                )}
+              </div>
+
+              {/* Expense percentage */}
+              <div className="p-4 rounded-lg bg-muted">
+                <p className="text-sm text-muted-foreground">Ratio dépenses/CA</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <div className="flex-1 h-2 bg-background rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full ${detailData.expensePercentage > 80 ? 'bg-destructive' : detailData.expensePercentage > 50 ? 'bg-warning' : 'bg-accent'}`}
+                      style={{ width: `${Math.min(detailData.expensePercentage, 100)}%` }}
+                    />
+                  </div>
+                  <span className="font-bold text-sm">{detailData.expensePercentage.toFixed(1)}%</span>
+                </div>
+              </div>
+
+              {/* Profit */}
+              <div className={`p-4 rounded-lg ${detailData.profit >= 0 ? 'bg-accent/10 border border-accent/20' : 'bg-destructive/10 border border-destructive/20'}`}>
+                <p className="text-sm text-muted-foreground">Bénéfice</p>
+                <p className={`text-2xl font-bold ${detailData.profit >= 0 ? 'text-accent' : 'text-destructive'}`}>
+                  {detailData.profit >= 0 ? '+' : ''}{detailData.profit.toFixed(0)} CFA
+                </p>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Filter */}
       <Card>
@@ -345,7 +504,7 @@ const Dashboard = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {dailyReport.slice(0, 10).map((day, index) => (
+            {dailyReport.slice(0, 10).map((day) => (
               <div 
                 key={day.date} 
                 className={`flex items-center justify-between p-4 rounded-lg border ${
