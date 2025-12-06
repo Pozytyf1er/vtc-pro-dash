@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2, User, Calendar, Phone, Mail, CreditCard, Car } from "lucide-react";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { driverSchema, getValidationErrors, devLog } from "@/lib/validations";
 
 interface Driver {
   id: string;
@@ -32,6 +34,8 @@ const Drivers = () => {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     first_name: '',
     last_name: '',
@@ -63,7 +67,7 @@ const Drivers = () => {
       if (error) throw error;
       setDrivers(data || []);
     } catch (error) {
-      console.error('Error fetching drivers:', error);
+      devLog.error('Error fetching drivers:', error);
       toast.error("Erreur lors du chargement des conducteurs");
     } finally {
       setLoading(false);
@@ -83,12 +87,19 @@ const Drivers = () => {
       if (error) throw error;
       setVehicles(data || []);
     } catch (error) {
-      console.error('Error fetching vehicles:', error);
+      devLog.error('Error fetching vehicles:', error);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors([]);
+
+    const validation = driverSchema.safeParse(formData);
+    if (!validation.success) {
+      setErrors(getValidationErrors(validation));
+      return;
+    }
     
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -100,6 +111,7 @@ const Drivers = () => {
           .update({
             ...formData,
             assigned_vehicle_id: formData.assigned_vehicle_id || null,
+            email: formData.email || null,
           })
           .eq('id', editingDriver.id);
 
@@ -111,6 +123,7 @@ const Drivers = () => {
           .insert([{ 
             ...formData,
             assigned_vehicle_id: formData.assigned_vehicle_id || null,
+            email: formData.email || null,
             user_id: user.id 
           }]);
 
@@ -121,7 +134,7 @@ const Drivers = () => {
       handleCloseDialog();
       fetchDrivers();
     } catch (error) {
-      console.error('Error saving driver:', error);
+      devLog.error('Error saving driver:', error);
       toast.error("Erreur lors de l'enregistrement du conducteur");
     }
   };
@@ -137,30 +150,33 @@ const Drivers = () => {
       license_expiry: driver.license_expiry || '',
       assigned_vehicle_id: driver.assigned_vehicle_id || '',
     });
+    setErrors([]);
     setIsDialogOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer ce conducteur ?")) return;
+  const handleDelete = async () => {
+    if (!deleteId) return;
 
     try {
       const { error } = await supabase
         .from('drivers')
         .delete()
-        .eq('id', id);
+        .eq('id', deleteId);
 
       if (error) throw error;
       toast.success("Conducteur supprimé avec succès");
       fetchDrivers();
     } catch (error) {
-      console.error('Error deleting driver:', error);
+      devLog.error('Error deleting driver:', error);
       toast.error("Erreur lors de la suppression du conducteur");
     }
+    setDeleteId(null);
   };
 
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingDriver(null);
+    setErrors([]);
     setFormData({
       first_name: '',
       last_name: '',
@@ -195,7 +211,11 @@ const Drivers = () => {
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">Chargement...</div>;
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+      </div>
+    );
   }
 
   return (
@@ -204,7 +224,7 @@ const Drivers = () => {
         <h1 className="text-3xl font-bold">Conducteurs</h1>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button onClick={() => { setEditingDriver(null); setErrors([]); }}>
               <Plus className="mr-2 h-4 w-4" />
               Nouveau Conducteur
             </Button>
@@ -215,6 +235,15 @@ const Drivers = () => {
                 {editingDriver ? 'Modifier le conducteur' : 'Ajouter un conducteur'}
               </DialogTitle>
             </DialogHeader>
+            {errors.length > 0 && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <ul className="list-inside list-disc space-y-1">
+                  {errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -224,6 +253,7 @@ const Drivers = () => {
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                     required
+                    maxLength={100}
                   />
                 </div>
                 <div>
@@ -233,6 +263,7 @@ const Drivers = () => {
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                     required
+                    maxLength={100}
                   />
                 </div>
               </div>
@@ -245,6 +276,7 @@ const Drivers = () => {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    maxLength={20}
                   />
                 </div>
                 <div>
@@ -254,6 +286,7 @@ const Drivers = () => {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    maxLength={255}
                   />
                 </div>
               </div>
@@ -265,6 +298,7 @@ const Drivers = () => {
                     id="license_number"
                     value={formData.license_number}
                     onChange={(e) => setFormData({ ...formData, license_number: e.target.value })}
+                    maxLength={50}
                   />
                 </div>
                 <div>
@@ -281,13 +315,14 @@ const Drivers = () => {
               <div>
                 <Label htmlFor="assigned_vehicle_id">Véhicule assigné</Label>
                 <Select
-                  value={formData.assigned_vehicle_id || undefined}
-                  onValueChange={(value) => setFormData({ ...formData, assigned_vehicle_id: value })}
+                  value={formData.assigned_vehicle_id || "none"}
+                  onValueChange={(value) => setFormData({ ...formData, assigned_vehicle_id: value === "none" ? "" : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Aucun véhicule" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Aucun véhicule</SelectItem>
                     {vehicles.map((vehicle) => (
                       <SelectItem key={vehicle.id} value={vehicle.id}>
                         {vehicle.model} ({vehicle.plate_number})
@@ -333,7 +368,7 @@ const Drivers = () => {
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(driver)}>
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(driver.id)}>
+                      <Button variant="ghost" size="icon" onClick={() => setDeleteId(driver.id)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -378,6 +413,15 @@ const Drivers = () => {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Supprimer le conducteur"
+        description="Êtes-vous sûr de vouloir supprimer ce conducteur ? Cette action est irréversible."
+        onConfirm={handleDelete}
+        confirmText="Supprimer"
+      />
     </div>
   );
 };

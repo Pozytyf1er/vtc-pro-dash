@@ -30,6 +30,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, TrendingUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { incomeSchema, getValidationErrors, devLog } from "@/lib/validations";
 
 interface Income {
   id: string;
@@ -48,6 +50,8 @@ const Incomes = () => {
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     amount: "",
@@ -75,6 +79,7 @@ const Incomes = () => {
     const { data, error } = await query.order("date", { ascending: false });
 
     if (error) {
+      devLog.error('Error fetching incomes:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les recettes",
@@ -88,6 +93,13 @@ const Incomes = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors([]);
+
+    const validation = incomeSchema.safeParse(formData);
+    if (!validation.success) {
+      setErrors(getValidationErrors(validation));
+      return;
+    }
 
     if (editingIncome) {
       const { error } = await supabase
@@ -101,6 +113,7 @@ const Incomes = () => {
         .eq("id", editingIncome.id);
 
       if (error) {
+        devLog.error('Error updating income:', error);
         toast({
           title: "Erreur",
           description: "Impossible de modifier la recette",
@@ -124,6 +137,7 @@ const Incomes = () => {
       });
 
       if (error) {
+        devLog.error('Error creating income:', error);
         toast({
           title: "Erreur",
           description: "Impossible d'ajouter la recette",
@@ -140,10 +154,13 @@ const Incomes = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("incomes").delete().eq("id", id);
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    
+    const { error } = await supabase.from("incomes").delete().eq("id", deleteId);
 
     if (error) {
+      devLog.error('Error deleting income:', error);
       toast({
         title: "Erreur",
         description: "Impossible de supprimer la recette",
@@ -156,6 +173,7 @@ const Incomes = () => {
       });
       fetchIncomes();
     }
+    setDeleteId(null);
   };
 
   const handleEdit = (income: Income) => {
@@ -166,12 +184,14 @@ const Incomes = () => {
       payment_method: income.payment_method,
       notes: income.notes || "",
     });
+    setErrors([]);
     setDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingIncome(null);
+    setErrors([]);
     setFormData({
       date: format(new Date(), "yyyy-MM-dd"),
       amount: "",
@@ -199,7 +219,7 @@ const Incomes = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setEditingIncome(null)}>
+            <Button onClick={() => { setEditingIncome(null); setErrors([]); }}>
               <Plus className="mr-2 h-4 w-4" />
               Ajouter une recette
             </Button>
@@ -210,6 +230,15 @@ const Incomes = () => {
                 {editingIncome ? "Modifier la recette" : "Nouvelle recette"}
               </DialogTitle>
             </DialogHeader>
+            {errors.length > 0 && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <ul className="list-inside list-disc space-y-1">
+                  {errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Date</Label>
@@ -259,6 +288,7 @@ const Incomes = () => {
                   placeholder="Informations complémentaires"
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  maxLength={500}
                 />
               </div>
               <div className="flex gap-2">
@@ -388,7 +418,7 @@ const Incomes = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(income.id)}
+                          onClick={() => setDeleteId(income.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -401,6 +431,15 @@ const Incomes = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Supprimer la recette"
+        description="Êtes-vous sûr de vouloir supprimer cette recette ? Cette action est irréversible."
+        onConfirm={handleDelete}
+        confirmText="Supprimer"
+      />
     </div>
   );
 };

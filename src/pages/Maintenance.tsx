@@ -32,6 +32,8 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, Wrench } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { maintenanceSchema, getValidationErrors, devLog } from "@/lib/validations";
 
 interface Maintenance {
   id: string;
@@ -61,6 +63,8 @@ const Maintenance = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingMaintenance, setEditingMaintenance] = useState<Maintenance | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     type: "",
     cost: "",
@@ -84,6 +88,7 @@ const Maintenance = () => {
       .eq("user_id", user?.id);
 
     if (error) {
+      devLog.error('Error fetching vehicles:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les véhicules",
@@ -102,6 +107,7 @@ const Maintenance = () => {
       .order("date", { ascending: false });
 
     if (error) {
+      devLog.error('Error fetching maintenances:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les maintenances",
@@ -115,6 +121,13 @@ const Maintenance = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors([]);
+
+    const validation = maintenanceSchema.safeParse(formData);
+    if (!validation.success) {
+      setErrors(getValidationErrors(validation));
+      return;
+    }
 
     const last_oil_km = formData.last_oil_change_km ? parseInt(formData.last_oil_change_km) : null;
     const interval = formData.oil_change_interval ? parseInt(formData.oil_change_interval) : null;
@@ -137,6 +150,7 @@ const Maintenance = () => {
         .eq("id", editingMaintenance.id);
 
       if (error) {
+        devLog.error('Error updating maintenance:', error);
         toast({
           title: "Erreur",
           description: "Impossible de modifier la maintenance",
@@ -165,22 +179,27 @@ const Maintenance = () => {
       }).select();
 
       if (error) {
+        devLog.error('Error creating maintenance:', error);
         toast({
           title: "Erreur",
           description: "Impossible d'ajouter la maintenance",
           variant: "destructive",
         });
       } else {
-        // Auto-add to expenses
+        // Auto-add to expenses with correct lowercase category
         const cost = parseFloat(formData.cost);
         if (cost > 0) {
-          await supabase.from("expenses").insert({
+          const { error: expenseError } = await supabase.from("expenses").insert({
             user_id: user?.id,
             amount: cost,
-            category: "Maintenance",
+            category: "maintenance", // Fixed: lowercase to match category system
             date: formData.date,
             description: `Maintenance: ${formData.type}`,
           });
+          
+          if (expenseError) {
+            devLog.error('Error creating expense from maintenance:', expenseError);
+          }
         }
         
         toast({
@@ -193,10 +212,13 @@ const Maintenance = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("maintenance").delete().eq("id", id);
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    
+    const { error } = await supabase.from("maintenance").delete().eq("id", deleteId);
 
     if (error) {
+      devLog.error('Error deleting maintenance:', error);
       toast({
         title: "Erreur",
         description: "Impossible de supprimer la maintenance",
@@ -209,6 +231,7 @@ const Maintenance = () => {
       });
       fetchMaintenances();
     }
+    setDeleteId(null);
   };
 
   const handleEdit = (maintenance: Maintenance) => {
@@ -223,12 +246,14 @@ const Maintenance = () => {
       last_oil_change_km: maintenance.last_oil_change_km?.toString() || "",
       oil_change_interval: maintenance.oil_change_interval?.toString() || "5000",
     });
+    setErrors([]);
     setDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingMaintenance(null);
+    setErrors([]);
     setFormData({
       type: "",
       cost: "",
@@ -241,17 +266,23 @@ const Maintenance = () => {
     });
   };
 
+  const getVehicleName = (vehicleId?: string) => {
+    if (!vehicleId) return "-";
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    return vehicle ? `${vehicle.model} (${vehicle.plate_number})` : "-";
+  };
+
   const totalCost = maintenances.reduce((sum, m) => sum + Number(m.cost), 0);
   const pendingCount = maintenances.filter((m) => m.status === "pending").length;
   const completedCount = maintenances.filter((m) => m.status === "completed").length;
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
     pending: "bg-warning text-warning-foreground",
     completed: "bg-accent text-accent-foreground",
     scheduled: "bg-secondary text-secondary-foreground",
   };
 
-  const statusLabels = {
+  const statusLabels: Record<string, string> = {
     pending: "En attente",
     completed: "Terminée",
     scheduled: "Planifiée",
@@ -274,17 +305,26 @@ const Maintenance = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setEditingMaintenance(null)}>
+            <Button onClick={() => { setEditingMaintenance(null); setErrors([]); }}>
               <Plus className="mr-2 h-4 w-4" />
               Ajouter une maintenance
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingMaintenance ? "Modifier la maintenance" : "Nouvelle maintenance"}
               </DialogTitle>
             </DialogHeader>
+            {errors.length > 0 && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <ul className="list-inside list-disc space-y-1">
+                  {errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="type">Type de maintenance</Label>
@@ -294,6 +334,7 @@ const Maintenance = () => {
                   value={formData.type}
                   onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                   required
+                  maxLength={200}
                 />
               </div>
 
@@ -344,15 +385,16 @@ const Maintenance = () => {
               <div className="space-y-2">
                 <Label htmlFor="vehicle">Véhicule (optionnel)</Label>
                 <Select
-                  value={formData.vehicle_id}
+                  value={formData.vehicle_id || "none"}
                   onValueChange={(value) =>
-                    setFormData({ ...formData, vehicle_id: value })
+                    setFormData({ ...formData, vehicle_id: value === "none" ? "" : value })
                   }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionner un véhicule" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Aucun véhicule</SelectItem>
                     {vehicles.map((vehicle) => (
                       <SelectItem key={vehicle.id} value={vehicle.id}>
                         {vehicle.model} - {vehicle.plate_number}
@@ -420,6 +462,7 @@ const Maintenance = () => {
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={3}
+                  maxLength={1000}
                 />
               </div>
 
@@ -491,6 +534,7 @@ const Maintenance = () => {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Véhicule</TableHead>
                 <TableHead>Statut</TableHead>
                 <TableHead className="text-right">Coût</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -499,20 +543,19 @@ const Maintenance = () => {
             <TableBody>
               {maintenances.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     Aucune maintenance enregistrée
                   </TableCell>
                 </TableRow>
               ) : (
                 maintenances.map((maintenance) => (
                   <TableRow key={maintenance.id}>
-                    <TableCell>
-                      {format(new Date(maintenance.date), "dd/MM/yyyy")}
-                    </TableCell>
+                    <TableCell>{format(new Date(maintenance.date), "dd/MM/yyyy")}</TableCell>
                     <TableCell>{maintenance.type}</TableCell>
+                    <TableCell>{getVehicleName(maintenance.vehicle_id)}</TableCell>
                     <TableCell>
-                      <Badge className={statusColors[maintenance.status as keyof typeof statusColors]}>
-                        {statusLabels[maintenance.status as keyof typeof statusLabels]}
+                      <Badge className={statusColors[maintenance.status]}>
+                        {statusLabels[maintenance.status]}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-medium">
@@ -530,7 +573,7 @@ const Maintenance = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(maintenance.id)}
+                          onClick={() => setDeleteId(maintenance.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -543,6 +586,15 @@ const Maintenance = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Supprimer la maintenance"
+        description="Êtes-vous sûr de vouloir supprimer cette maintenance ? Cette action est irréversible."
+        onConfirm={handleDelete}
+        confirmText="Supprimer"
+      />
     </div>
   );
 };

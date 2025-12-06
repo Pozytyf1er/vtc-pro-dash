@@ -30,6 +30,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Pencil, Trash2, TrendingDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import ConfirmDialog from "@/components/ConfirmDialog";
+import { expenseSchema, getValidationErrors, devLog } from "@/lib/validations";
 
 interface Expense {
   id: string;
@@ -48,6 +50,8 @@ const Expenses = () => {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     date: format(new Date(), "yyyy-MM-dd"),
     category: "fuel",
@@ -75,6 +79,7 @@ const Expenses = () => {
     const { data, error } = await query.order("date", { ascending: false });
 
     if (error) {
+      devLog.error('Error fetching expenses:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les dépenses",
@@ -88,6 +93,13 @@ const Expenses = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrors([]);
+
+    const validation = expenseSchema.safeParse(formData);
+    if (!validation.success) {
+      setErrors(getValidationErrors(validation));
+      return;
+    }
 
     if (editingExpense) {
       const { error } = await supabase
@@ -101,6 +113,7 @@ const Expenses = () => {
         .eq("id", editingExpense.id);
 
       if (error) {
+        devLog.error('Error updating expense:', error);
         toast({
           title: "Erreur",
           description: "Impossible de modifier la dépense",
@@ -124,6 +137,7 @@ const Expenses = () => {
       });
 
       if (error) {
+        devLog.error('Error creating expense:', error);
         toast({
           title: "Erreur",
           description: "Impossible d'ajouter la dépense",
@@ -140,10 +154,13 @@ const Expenses = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    const { error } = await supabase.from("expenses").delete().eq("id", id);
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    
+    const { error } = await supabase.from("expenses").delete().eq("id", deleteId);
 
     if (error) {
+      devLog.error('Error deleting expense:', error);
       toast({
         title: "Erreur",
         description: "Impossible de supprimer la dépense",
@@ -156,6 +173,7 @@ const Expenses = () => {
       });
       fetchExpenses();
     }
+    setDeleteId(null);
   };
 
   const handleEdit = (expense: Expense) => {
@@ -166,12 +184,14 @@ const Expenses = () => {
       amount: expense.amount.toString(),
       description: expense.description || "",
     });
+    setErrors([]);
     setDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingExpense(null);
+    setErrors([]);
     setFormData({
       date: format(new Date(), "yyyy-MM-dd"),
       category: "fuel",
@@ -213,7 +233,7 @@ const Expenses = () => {
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => setEditingExpense(null)}>
+            <Button onClick={() => { setEditingExpense(null); setErrors([]); }}>
               <Plus className="mr-2 h-4 w-4" />
               Ajouter une dépense
             </Button>
@@ -224,6 +244,15 @@ const Expenses = () => {
                 {editingExpense ? "Modifier la dépense" : "Nouvelle dépense"}
               </DialogTitle>
             </DialogHeader>
+            {errors.length > 0 && (
+              <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+                <ul className="list-inside list-disc space-y-1">
+                  {errors.map((error, index) => (
+                    <li key={index}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Date</Label>
@@ -262,8 +291,8 @@ const Expenses = () => {
                 <Input
                   id="amount"
                   type="number"
-                    step="1"
-                    placeholder="0"
+                  step="1"
+                  placeholder="0"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   required
@@ -278,6 +307,7 @@ const Expenses = () => {
                   onChange={(e) =>
                     setFormData({ ...formData, description: e.target.value })
                   }
+                  maxLength={500}
                 />
               </div>
               <div className="flex gap-2">
@@ -362,7 +392,7 @@ const Expenses = () => {
             <Card key={category}>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {categoryLabels[category]}
+                  {categoryLabels[category] || category}
                 </CardTitle>
                 <TrendingDown className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
@@ -371,7 +401,7 @@ const Expenses = () => {
                   {amount.toFixed(0)} CFA
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {((amount / totalAmount) * 100).toFixed(0)}% du total
+                  {totalAmount > 0 ? ((amount / totalAmount) * 100).toFixed(0) : 0}% du total
                 </p>
               </CardContent>
             </Card>
@@ -402,7 +432,7 @@ const Expenses = () => {
                   <TableRow key={expense.id}>
                     <TableCell>{format(new Date(expense.date), "dd/MM/yyyy")}</TableCell>
                     <TableCell className="capitalize">
-                      {categoryLabels[expense.category]}
+                      {categoryLabels[expense.category] || expense.category}
                     </TableCell>
                     <TableCell>{expense.description || "-"}</TableCell>
                     <TableCell className="text-right font-medium text-destructive">
@@ -420,7 +450,7 @@ const Expenses = () => {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(expense.id)}
+                          onClick={() => setDeleteId(expense.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -433,6 +463,15 @@ const Expenses = () => {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Supprimer la dépense"
+        description="Êtes-vous sûr de vouloir supprimer cette dépense ? Cette action est irréversible."
+        onConfirm={handleDelete}
+        confirmText="Supprimer"
+      />
     </div>
   );
 };
