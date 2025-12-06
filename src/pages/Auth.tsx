@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Car } from "lucide-react";
+import { signInSchema, signUpSchema, getValidationErrors } from "@/lib/validations";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -15,6 +16,7 @@ const Auth = () => {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
   const { signIn, signUp, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -27,8 +29,15 @@ const Auth = () => {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setErrors([]);
 
+    const validation = signInSchema.safeParse({ email, password });
+    if (!validation.success) {
+      setErrors(getValidationErrors(validation));
+      return;
+    }
+
+    setLoading(true);
     const { error } = await signIn(email, password);
 
     if (error) {
@@ -50,8 +59,15 @@ const Auth = () => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setErrors([]);
 
+    const validation = signUpSchema.safeParse({ email, password, firstName, lastName });
+    if (!validation.success) {
+      setErrors(getValidationErrors(validation));
+      return;
+    }
+
+    setLoading(true);
     const { error } = await signUp(email, password, firstName, lastName);
 
     if (error) {
@@ -82,7 +98,16 @@ const Auth = () => {
           <CardDescription>Gérez votre activité VTC en toute simplicité</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="signin" className="w-full">
+          {errors.length > 0 && (
+            <div className="mb-4 rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
+              <ul className="list-inside list-disc space-y-1">
+                {errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <Tabs defaultValue="signin" className="w-full" onValueChange={() => setErrors([])}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Connexion</TabsTrigger>
               <TabsTrigger value="signup">Inscription</TabsTrigger>
@@ -110,6 +135,7 @@ const Auth = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">Minimum 8 caractères</p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Connexion..." : "Se connecter"}
@@ -161,6 +187,9 @@ const Auth = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Min. 8 caractères, 1 majuscule, 1 chiffre
+                  </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? "Inscription..." : "S'inscrire"}
