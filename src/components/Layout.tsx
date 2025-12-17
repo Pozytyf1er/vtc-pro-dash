@@ -1,8 +1,10 @@
 import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
+import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
-import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart, Shield } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
@@ -15,6 +17,7 @@ const Layout = ({ children }: LayoutProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut } = useAuth();
+  const { isAdmin, isDriver, role } = useUserRole();
   const isMobile = useIsMobile();
   const [theme, setTheme] = useState<"light" | "dark">("light");
 
@@ -33,14 +36,23 @@ const Layout = ({ children }: LayoutProps) => {
     document.documentElement.classList.toggle("dark", newTheme === "dark");
   };
 
-  const menuItems = [
+  // Menu items based on role
+  const adminMenuItems = [
     { icon: BarChart3, label: "Tableau de bord", path: "/" },
+    { icon: PieChart, label: "Rentabilité", path: "/profitability" },
     { icon: TrendingUp, label: "Recettes", path: "/incomes" },
     { icon: TrendingDown, label: "Dépenses", path: "/expenses" },
     { icon: Car, label: "Véhicules", path: "/vehicle" },
     { icon: Users, label: "Conducteurs", path: "/drivers" },
     { icon: Wrench, label: "Maintenance", path: "/maintenance" },
   ];
+
+  const driverMenuItems = [
+    { icon: Timer, label: "Mes Shifts", path: "/shifts" },
+    { icon: BarChart3, label: "Ma Performance", path: "/my-stats" },
+  ];
+
+  const menuItems = isAdmin ? adminMenuItems : driverMenuItems;
 
   const NavContent = () => (
     <>
@@ -50,7 +62,18 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
         <div>
           <h1 className="text-lg font-bold text-foreground">VTC Manager</h1>
-          <p className="text-xs text-muted-foreground">Gérez votre activité</p>
+          <div className="flex items-center gap-1">
+            <Badge variant={isAdmin ? "default" : "secondary"} className="text-xs">
+              {isAdmin ? (
+                <>
+                  <Shield className="mr-1 h-3 w-3" />
+                  Admin
+                </>
+              ) : (
+                "Conducteur"
+              )}
+            </Badge>
+          </div>
         </div>
       </div>
       <nav className="flex-1 space-y-1 p-4">

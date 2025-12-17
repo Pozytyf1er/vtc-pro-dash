@@ -14,6 +14,9 @@ import Vehicle from "./pages/Vehicle";
 import Drivers from "./pages/Drivers";
 import VehicleStats from "./pages/VehicleStats";
 import Maintenance from "./pages/Maintenance";
+import Shifts from "./pages/Shifts";
+import MyStats from "./pages/MyStats";
+import Profitability from "./pages/Profitability";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -93,6 +96,36 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Maintenance />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/shifts"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Shifts />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-stats"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <MyStats />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profitability"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Profitability />
                   </Layout>
                 </ProtectedRoute>
               }
