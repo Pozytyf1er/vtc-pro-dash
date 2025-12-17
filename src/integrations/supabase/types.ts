@@ -201,6 +201,93 @@ export type Database = {
         }
         Relationships: []
       }
+      shifts: {
+        Row: {
+          created_at: string
+          driver_id: string | null
+          end_mileage: number | null
+          end_time: string | null
+          fuel_cost: number
+          id: string
+          notes: string | null
+          start_mileage: number
+          start_time: string
+          status: string
+          total_revenue: number
+          updated_at: string
+          user_id: string
+          vehicle_id: string
+        }
+        Insert: {
+          created_at?: string
+          driver_id?: string | null
+          end_mileage?: number | null
+          end_time?: string | null
+          fuel_cost?: number
+          id?: string
+          notes?: string | null
+          start_mileage?: number
+          start_time?: string
+          status?: string
+          total_revenue?: number
+          updated_at?: string
+          user_id: string
+          vehicle_id: string
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string | null
+          end_mileage?: number | null
+          end_time?: string | null
+          fuel_cost?: number
+          id?: string
+          notes?: string | null
+          start_mileage?: number
+          start_time?: string
+          status?: string
+          total_revenue?: number
+          updated_at?: string
+          user_id?: string
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shifts_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       vehicles: {
         Row: {
           assigned_driver_id: string | null
@@ -209,8 +296,11 @@ export type Database = {
           insurance_expiry: string | null
           mileage: number
           model: string
+          monthly_insurance_cost: number | null
+          monthly_lease_cost: number | null
           next_oil_change: number | null
           plate_number: string
+          purchase_price: number | null
           technical_inspection_expiry: string | null
           updated_at: string
           user_id: string
@@ -222,8 +312,11 @@ export type Database = {
           insurance_expiry?: string | null
           mileage?: number
           model: string
+          monthly_insurance_cost?: number | null
+          monthly_lease_cost?: number | null
           next_oil_change?: number | null
           plate_number: string
+          purchase_price?: number | null
           technical_inspection_expiry?: string | null
           updated_at?: string
           user_id: string
@@ -235,8 +328,11 @@ export type Database = {
           insurance_expiry?: string | null
           mileage?: number
           model?: string
+          monthly_insurance_cost?: number | null
+          monthly_lease_cost?: number | null
           next_oil_change?: number | null
           plate_number?: string
+          purchase_price?: number | null
           technical_inspection_expiry?: string | null
           updated_at?: string
           user_id?: string
@@ -256,10 +352,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "driver"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -386,6 +488,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "driver"],
+    },
   },
 } as const
