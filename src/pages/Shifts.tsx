@@ -21,9 +21,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Play, Square, Car, Clock, Fuel, TrendingUp, MapPin } from "lucide-react";
+import { Play, Square, Car, Clock, Fuel, TrendingUp, MapPin, Pencil, Trash2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import ConfirmDialog from "@/components/ConfirmDialog";
 
 interface Shift {
   id: string;
@@ -55,6 +56,9 @@ const Shifts = () => {
   const [loading, setLoading] = useState(true);
   const [startDialogOpen, setStartDialogOpen] = useState(false);
   const [endDialogOpen, setEndDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   // Form states
   const [selectedVehicle, setSelectedVehicle] = useState("");
@@ -217,6 +221,63 @@ const Shifts = () => {
     }
   };
 
+  const handleEdit = (shift: Shift) => {
+    setEditingShift(shift);
+    setSelectedVehicle(shift.vehicle_id);
+    setStartMileage(shift.start_mileage.toString());
+    setEndMileage(shift.end_mileage?.toString() || "");
+    setTotalRevenue(shift.total_revenue.toString());
+    setFuelCost(shift.fuel_cost.toString());
+    setNotes(shift.notes || "");
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateShift = async () => {
+    if (!editingShift) return;
+
+    const mileageEnd = endMileage ? parseInt(endMileage) : null;
+    const revenue = parseFloat(totalRevenue) || 0;
+    const fuel = parseFloat(fuelCost) || 0;
+
+    const { data, error } = await supabase
+      .from("shifts")
+      .update({
+        start_mileage: parseInt(startMileage),
+        end_mileage: mileageEnd,
+        total_revenue: revenue,
+        fuel_cost: fuel,
+        notes: notes || null,
+      })
+      .eq("id", editingShift.id)
+      .select("*, vehicles(model, plate_number)")
+      .single();
+
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de modifier le shift", variant: "destructive" });
+      return;
+    }
+
+    setShifts((prev) => prev.map((s) => (s.id === data.id ? data : s)));
+    setEditDialogOpen(false);
+    setEditingShift(null);
+    resetForm();
+    toast({ title: "Succès", description: "Shift modifié avec succès" });
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
+    const { error } = await supabase.from("shifts").delete().eq("id", deleteId);
+
+    if (error) {
+      toast({ title: "Erreur", description: "Impossible de supprimer le shift", variant: "destructive" });
+    } else {
+      setShifts((prev) => prev.filter((s) => s.id !== deleteId));
+      toast({ title: "Succès", description: "Shift supprimé avec succès" });
+    }
+    setDeleteId(null);
+  };
+
   // Calculate today's stats
   const todayStr = format(new Date(), "yyyy-MM-dd");
   const todayShifts = shifts.filter(
@@ -352,10 +413,24 @@ const Shifts = () => {
                       )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-accent">
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold text-accent mr-2">
                       +{Number(shift.total_revenue).toLocaleString()} CFA
                     </p>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(shift)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => setDeleteId(shift.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -463,6 +538,80 @@ const Shifts = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Shift Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Modifier le shift</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Kilométrage de départ</Label>
+              <Input
+                type="number"
+                value={startMileage}
+                onChange={(e) => setStartMileage(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Kilométrage final</Label>
+              <Input
+                type="number"
+                value={endMileage}
+                onChange={(e) => setEndMileage(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Recettes totales (CFA)</Label>
+              <Input
+                type="number"
+                value={totalRevenue}
+                onChange={(e) => setTotalRevenue(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Coût carburant (CFA)</Label>
+              <Input
+                type="number"
+                value={fuelCost}
+                onChange={(e) => setFuelCost(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                placeholder="Notes optionnelles..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button onClick={handleUpdateShift} className="flex-1">
+                Modifier
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => { setEditDialogOpen(false); setEditingShift(null); }}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+        title="Supprimer le shift"
+        description="Êtes-vous sûr de vouloir supprimer ce shift ? Cette action est irréversible."
+        onConfirm={handleDelete}
+        confirmText="Supprimer"
+      />
     </div>
   );
 };
