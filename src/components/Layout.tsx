@@ -3,8 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart, Shield } from "lucide-react";
+import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
@@ -36,10 +35,9 @@ const Layout = ({ children }: LayoutProps) => {
     document.documentElement.classList.toggle("dark", newTheme === "dark");
   };
 
-  // Menu items based on role
-  const adminMenuItems = [
+  // Menu items - original menu for all users
+  const baseMenuItems = [
     { icon: BarChart3, label: "Tableau de bord", path: "/" },
-    { icon: PieChart, label: "Rentabilité", path: "/profitability" },
     { icon: TrendingUp, label: "Recettes", path: "/incomes" },
     { icon: TrendingDown, label: "Dépenses", path: "/expenses" },
     { icon: Car, label: "Véhicules", path: "/vehicle" },
@@ -47,12 +45,17 @@ const Layout = ({ children }: LayoutProps) => {
     { icon: Wrench, label: "Maintenance", path: "/maintenance" },
   ];
 
-  const driverMenuItems = [
-    { icon: Timer, label: "Mes Shifts", path: "/shifts" },
-    { icon: BarChart3, label: "Ma Performance", path: "/my-stats" },
+  // Additional menu items for new features
+  const additionalItems = [
+    { icon: Timer, label: "Shifts", path: "/shifts" },
+    { icon: PieChart, label: "Rentabilité", path: "/profitability", adminOnly: true },
   ];
 
-  const menuItems = isAdmin ? adminMenuItems : driverMenuItems;
+  // Combine all items, filtering admin-only if not admin
+  const menuItems = [
+    ...baseMenuItems,
+    ...additionalItems.filter(item => !item.adminOnly || isAdmin),
+  ];
 
   const NavContent = () => (
     <>
@@ -60,21 +63,7 @@ const Layout = ({ children }: LayoutProps) => {
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
           <Car className="h-6 w-6 text-primary-foreground" />
         </div>
-        <div>
-          <h1 className="text-lg font-bold text-foreground">VTC Manager</h1>
-          <div className="flex items-center gap-1">
-            <Badge variant={isAdmin ? "default" : "secondary"} className="text-xs">
-              {isAdmin ? (
-                <>
-                  <Shield className="mr-1 h-3 w-3" />
-                  Admin
-                </>
-              ) : (
-                "Conducteur"
-              )}
-            </Badge>
-          </div>
-        </div>
+        <h1 className="text-lg font-bold text-foreground">VTC Manager</h1>
       </div>
       <nav className="flex-1 space-y-1 p-4">
         {menuItems.map((item) => (
