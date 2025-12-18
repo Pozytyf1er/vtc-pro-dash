@@ -179,6 +179,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
           first_name: string | null
           id: string
@@ -186,6 +187,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
@@ -193,6 +195,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
@@ -266,6 +269,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_alert_settings: {
+        Row: {
+          created_at: string
+          id: string
+          inspection_alert_days: number | null
+          insurance_alert_days: number | null
+          license_alert_days: number | null
+          oil_change_alert_days: number | null
+          push_enabled: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inspection_alert_days?: number | null
+          insurance_alert_days?: number | null
+          license_alert_days?: number | null
+          oil_change_alert_days?: number | null
+          push_enabled?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inspection_alert_days?: number | null
+          insurance_alert_days?: number | null
+          license_alert_days?: number | null
+          oil_change_alert_days?: number | null
+          push_enabled?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {
