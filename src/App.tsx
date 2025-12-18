@@ -17,6 +17,7 @@ import Maintenance from "./pages/Maintenance";
 import Shifts from "./pages/Shifts";
 import MyStats from "./pages/MyStats";
 import Profitability from "./pages/Profitability";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -126,6 +127,16 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Profitability />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Settings />
                   </Layout>
                 </ProtectedRoute>
               }
