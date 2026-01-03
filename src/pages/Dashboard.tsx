@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, DollarSign, AlertTriangle, Filter } from "lucide-react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
@@ -53,6 +53,8 @@ const Dashboard = () => {
   const [detailData, setDetailData] = useState<DetailData | null>(null);
   const [allIncomes, setAllIncomes] = useState<any[]>([]);
   const [allExpenses, setAllExpenses] = useState<any[]>([]);
+  const [monthlyRevenueData, setMonthlyRevenueData] = useState<any[]>([]);
+  const [expenseByCategoryData, setExpenseByCategoryData] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -143,6 +145,12 @@ const Dashboard = () => {
     const periodIncomes = incomes?.filter(i => new Date(i.date) >= periodStart) || [];
     const periodExpenses = expenses?.filter(e => new Date(e.date) >= periodStart) || [];
     generateChartData(today, periodIncomes, periodExpenses, parseInt(filterPeriod));
+    
+    // Generate monthly revenue evolution (last 12 months)
+    generateMonthlyRevenueData(incomes || [], expenses || []);
+    
+    // Generate expense by category data
+    generateExpenseByCategoryData(periodExpenses);
 
     // Generate daily report for the selected period
     const dailyMap = new Map();
@@ -250,6 +258,66 @@ const Dashboard = () => {
       }
     }
     setChartData(data);
+  };
+
+  const generateMonthlyRevenueData = (incomes: any[], expenses: any[]) => {
+    const data = [];
+    const today = new Date();
+    
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = subMonths(today, i);
+      const monthStart = startOfMonth(monthDate);
+      const nextMonth = subMonths(today, i - 1);
+      const monthEnd = i === 0 ? today : startOfMonth(nextMonth);
+      
+      const monthIncomes = incomes.filter((inc) => {
+        const d = new Date(inc.date);
+        return d >= monthStart && d < monthEnd;
+      }).reduce((sum, inc) => sum + Number(inc.amount), 0);
+      
+      const monthExpenses = expenses.filter((exp) => {
+        const d = new Date(exp.date);
+        return d >= monthStart && d < monthEnd;
+      }).reduce((sum, exp) => sum + Number(exp.amount), 0);
+      
+      data.push({
+        month: format(monthStart, "MMM yy", { locale: fr }),
+        revenus: monthIncomes,
+        dépenses: monthExpenses,
+        bénéfice: monthIncomes - monthExpenses,
+      });
+    }
+    setMonthlyRevenueData(data);
+  };
+
+  const generateExpenseByCategoryData = (expenses: any[]) => {
+    const categoryMap = new Map<string, number>();
+    
+    expenses.forEach((exp) => {
+      const category = exp.category || 'Autre';
+      categoryMap.set(category, (categoryMap.get(category) || 0) + Number(exp.amount));
+    });
+    
+    const data = Array.from(categoryMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+    
+    setExpenseByCategoryData(data);
+  };
+
+  const CATEGORY_COLORS: Record<string, string> = {
+    carburant: 'hsl(var(--chart-1))',
+    maintenance: 'hsl(var(--chart-2))',
+    assurance: 'hsl(var(--chart-3))',
+    leasing: 'hsl(var(--chart-4))',
+    péage: 'hsl(var(--chart-5))',
+    nettoyage: 'hsl(200, 70%, 50%)',
+    téléphone: 'hsl(280, 70%, 50%)',
+    autre: 'hsl(0, 0%, 50%)',
+  };
+
+  const getCategoryColor = (category: string) => {
+    return CATEGORY_COLORS[category.toLowerCase()] || 'hsl(var(--muted-foreground))';
   };
 
   const openDetailDialog = (type: 'today' | 'week' | 'month') => {
@@ -543,7 +611,7 @@ const Dashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Charts */}
+      {/* Charts - Row 1 */}
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -578,23 +646,83 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Comparaison recettes/dépenses</CardTitle>
+            <CardTitle>Répartition des dépenses par catégorie</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="date" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="recettes" fill="hsl(var(--accent))" name="Recettes" />
-                <Bar dataKey="dépenses" fill="hsl(var(--destructive))" name="Dépenses" />
-              </BarChart>
-            </ResponsiveContainer>
+            {expenseByCategoryData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={expenseByCategoryData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={2}
+                    dataKey="value"
+                    label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                    labelLine={true}
+                  >
+                    {expenseByCategoryData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={getCategoryColor(entry.name)} />
+                    ))}
+                  </Pie>
+                  <Tooltip 
+                    formatter={(value: number) => `${value.toFixed(0)} CFA`}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                Aucune dépense sur cette période
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Charts - Row 2: Monthly Revenue Evolution */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Évolution des revenus mensuels (12 derniers mois)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart data={monthlyRevenueData}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="month" className="text-xs" />
+              <YAxis className="text-xs" />
+              <Tooltip 
+                formatter={(value: number) => `${value.toFixed(0)} CFA`}
+              />
+              <Legend />
+              <Bar dataKey="revenus" fill="hsl(var(--accent))" name="Revenus" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="dépenses" fill="hsl(var(--destructive))" name="Dépenses" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="bénéfice" fill="hsl(var(--primary))" name="Bénéfice" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Charts - Row 3: Comparison */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Comparaison recettes/dépenses - {getPeriodLabel(filterPeriod)}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis dataKey="date" className="text-xs" />
+              <YAxis className="text-xs" />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="recettes" fill="hsl(var(--accent))" name="Recettes" />
+              <Bar dataKey="dépenses" fill="hsl(var(--destructive))" name="Dépenses" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       {/* Daily Report */}
       <Card>
