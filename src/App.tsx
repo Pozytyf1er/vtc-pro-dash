@@ -18,6 +18,7 @@ import Shifts from "./pages/Shifts";
 import MyStats from "./pages/MyStats";
 import Profitability from "./pages/Profitability";
 import Settings from "./pages/Settings";
+import DriverDashboard from "./pages/DriverDashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -137,6 +138,16 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <Settings />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/driver-dashboard"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <DriverDashboard />
                   </Layout>
                 </ProtectedRoute>
               }

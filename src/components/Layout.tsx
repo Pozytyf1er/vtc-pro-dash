@@ -3,11 +3,12 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
-import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart, Settings } from "lucide-react";
+import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart, Settings, UserCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
 import { AlertsBanner } from "@/components/AlertsBanner";
+import OfflineIndicator from "@/components/OfflineIndicator";
 
 interface LayoutProps {
   children: ReactNode;
@@ -49,6 +50,7 @@ const Layout = ({ children }: LayoutProps) => {
   // Additional menu items for new features
   const additionalItems = [
     { icon: Timer, label: "Shifts", path: "/shifts" },
+    { icon: UserCircle, label: "Mon tableau de bord", path: "/driver-dashboard" },
     { icon: PieChart, label: "Rentabilité", path: "/profitability", adminOnly: true },
   ];
 
@@ -155,6 +157,7 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         )}
         <div className="container mx-auto p-6">{children}</div>
+        <OfflineIndicator />
       </main>
     </div>
   );

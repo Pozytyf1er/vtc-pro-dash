@@ -39,17 +39,26 @@ interface Income {
   amount: number;
   payment_method: string;
   notes?: string;
+  vehicle_id?: string;
+}
+
+interface Vehicle {
+  id: string;
+  model: string;
+  plate_number: string;
 }
 
 const Incomes = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [incomes, setIncomes] = useState<Income[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -57,11 +66,24 @@ const Incomes = () => {
     amount: "",
     payment_method: "cash",
     notes: "",
+    vehicle_id: "",
   });
 
   useEffect(() => {
+    fetchVehicles();
+  }, [user]);
+
+  useEffect(() => {
     fetchIncomes();
-  }, [user, startDate, endDate]);
+  }, [user, startDate, endDate, vehicleFilter]);
+
+  const fetchVehicles = async () => {
+    const { data } = await supabase
+      .from("vehicles")
+      .select("id, model, plate_number")
+      .eq("user_id", user?.id);
+    setVehicles(data || []);
+  };
 
   const fetchIncomes = async () => {
     let query = supabase
@@ -74,6 +96,9 @@ const Incomes = () => {
     }
     if (endDate) {
       query = query.lte('date', endDate);
+    }
+    if (vehicleFilter) {
+      query = query.eq('vehicle_id', vehicleFilter);
     }
 
     const { data, error } = await query.order("date", { ascending: false });
@@ -89,6 +114,12 @@ const Incomes = () => {
       setIncomes(data || []);
     }
     setLoading(false);
+  };
+
+  const getVehicleName = (vehicleId?: string) => {
+    if (!vehicleId) return "-";
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    return vehicle ? `${vehicle.model} (${vehicle.plate_number})` : "-";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -109,6 +140,7 @@ const Incomes = () => {
           amount: parseFloat(formData.amount),
           payment_method: formData.payment_method,
           notes: formData.notes,
+          vehicle_id: formData.vehicle_id || null,
         })
         .eq("id", editingIncome.id);
 
@@ -134,6 +166,7 @@ const Incomes = () => {
         amount: parseFloat(formData.amount),
         payment_method: formData.payment_method,
         notes: formData.notes,
+        vehicle_id: formData.vehicle_id || null,
       });
 
       if (error) {
@@ -183,6 +216,7 @@ const Incomes = () => {
       amount: income.amount.toString(),
       payment_method: income.payment_method,
       notes: income.notes || "",
+      vehicle_id: income.vehicle_id || "",
     });
     setErrors([]);
     setDialogOpen(true);
@@ -197,6 +231,7 @@ const Incomes = () => {
       amount: "",
       payment_method: "cash",
       notes: "",
+      vehicle_id: "",
     });
   };
 
@@ -291,6 +326,27 @@ const Incomes = () => {
                   maxLength={500}
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicle">Véhicule (optionnel)</Label>
+                <Select
+                  value={formData.vehicle_id || "none"}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, vehicle_id: value === "none" ? "" : value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un véhicule" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Aucun véhicule</SelectItem>
+                    {vehicles.map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.model} - {vehicle.plate_number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex gap-2">
                 <Button type="submit" className="flex-1">
                   {editingIncome ? "Modifier" : "Ajouter"}
@@ -311,10 +367,10 @@ const Incomes = () => {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Filtres par date</CardTitle>
+          <CardTitle>Filtres</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label htmlFor="startDate">Date de début</Label>
               <Input
@@ -333,12 +389,32 @@ const Incomes = () => {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
+            <div>
+              <Label htmlFor="vehicleFilter">Véhicule</Label>
+              <Select
+                value={vehicleFilter || "all"}
+                onValueChange={(value) => setVehicleFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tous les véhicules" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les véhicules</SelectItem>
+                  {vehicles.map((vehicle) => (
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
+                      {vehicle.model} - {vehicle.plate_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-end">
               <Button
                 variant="outline"
                 onClick={() => {
                   setStartDate('');
                   setEndDate('');
+                  setVehicleFilter('');
                 }}
               >
                 Réinitialiser
@@ -385,6 +461,7 @@ const Incomes = () => {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead className="text-right">Montant</TableHead>
+                <TableHead>Véhicule</TableHead>
                 <TableHead>Paiement</TableHead>
                 <TableHead>Notes</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -393,7 +470,7 @@ const Incomes = () => {
             <TableBody>
               {incomes.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     Aucune recette enregistrée
                   </TableCell>
                 </TableRow>
@@ -404,6 +481,7 @@ const Incomes = () => {
                     <TableCell className="text-right font-medium text-accent">
                       {Number(income.amount).toFixed(0)} CFA
                     </TableCell>
+                    <TableCell>{getVehicleName(income.vehicle_id)}</TableCell>
                     <TableCell className="capitalize">{income.payment_method}</TableCell>
                     <TableCell>{income.notes || "-"}</TableCell>
                     <TableCell className="text-right">
