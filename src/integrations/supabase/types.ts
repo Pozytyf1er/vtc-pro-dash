@@ -103,6 +103,7 @@ export type Database = {
           notes: string | null
           payment_method: string
           user_id: string
+          vehicle_id: string | null
         }
         Insert: {
           amount: number
@@ -112,6 +113,7 @@ export type Database = {
           notes?: string | null
           payment_method: string
           user_id: string
+          vehicle_id?: string | null
         }
         Update: {
           amount?: number
@@ -121,8 +123,17 @@ export type Database = {
           notes?: string | null
           payment_method?: string
           user_id?: string
+          vehicle_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "incomes_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       maintenance: {
         Row: {

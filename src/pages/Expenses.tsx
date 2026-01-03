@@ -39,17 +39,26 @@ interface Expense {
   category: string;
   amount: number;
   description?: string;
+  vehicle_id?: string;
+}
+
+interface Vehicle {
+  id: string;
+  model: string;
+  plate_number: string;
 }
 
 const Expenses = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -57,11 +66,24 @@ const Expenses = () => {
     category: "fuel",
     amount: "",
     description: "",
+    vehicle_id: "",
   });
 
   useEffect(() => {
+    fetchVehicles();
+  }, [user]);
+
+  useEffect(() => {
     fetchExpenses();
-  }, [user, startDate, endDate]);
+  }, [user, startDate, endDate, vehicleFilter]);
+
+  const fetchVehicles = async () => {
+    const { data } = await supabase
+      .from("vehicles")
+      .select("id, model, plate_number")
+      .eq("user_id", user?.id);
+    setVehicles(data || []);
+  };
 
   const fetchExpenses = async () => {
     let query = supabase
@@ -74,6 +96,9 @@ const Expenses = () => {
     }
     if (endDate) {
       query = query.lte('date', endDate);
+    }
+    if (vehicleFilter) {
+      query = query.eq('vehicle_id', vehicleFilter);
     }
 
     const { data, error } = await query.order("date", { ascending: false });
@@ -89,6 +114,12 @@ const Expenses = () => {
       setExpenses(data || []);
     }
     setLoading(false);
+  };
+
+  const getVehicleName = (vehicleId?: string) => {
+    if (!vehicleId) return "-";
+    const vehicle = vehicles.find(v => v.id === vehicleId);
+    return vehicle ? `${vehicle.model} (${vehicle.plate_number})` : "-";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -183,6 +214,7 @@ const Expenses = () => {
       category: expense.category,
       amount: expense.amount.toString(),
       description: expense.description || "",
+      vehicle_id: expense.vehicle_id || "",
     });
     setErrors([]);
     setDialogOpen(true);
@@ -197,6 +229,7 @@ const Expenses = () => {
       category: "fuel",
       amount: "",
       description: "",
+      vehicle_id: "",
     });
   };
 
@@ -330,10 +363,10 @@ const Expenses = () => {
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Filtres par date</CardTitle>
+          <CardTitle>Filtres</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <Label htmlFor="startDate">Date de début</Label>
               <Input
@@ -352,12 +385,32 @@ const Expenses = () => {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
+            <div>
+              <Label htmlFor="vehicleFilter">Véhicule</Label>
+              <Select
+                value={vehicleFilter || "all"}
+                onValueChange={(value) => setVehicleFilter(value === "all" ? "" : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Tous les véhicules" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les véhicules</SelectItem>
+                  {vehicles.map((vehicle) => (
+                    <SelectItem key={vehicle.id} value={vehicle.id}>
+                      {vehicle.model} - {vehicle.plate_number}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex items-end">
               <Button
                 variant="outline"
                 onClick={() => {
                   setStartDate('');
                   setEndDate('');
+                  setVehicleFilter('');
                 }}
               >
                 Réinitialiser
