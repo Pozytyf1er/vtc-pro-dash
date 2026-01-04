@@ -73,6 +73,7 @@ export type Database = {
           description: string | null
           id: string
           user_id: string
+          vehicle_id: string | null
         }
         Insert: {
           amount: number
@@ -82,6 +83,7 @@ export type Database = {
           description?: string | null
           id?: string
           user_id: string
+          vehicle_id?: string | null
         }
         Update: {
           amount?: number
@@ -91,8 +93,17 @@ export type Database = {
           description?: string | null
           id?: string
           user_id?: string
+          vehicle_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expenses_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       incomes: {
         Row: {
