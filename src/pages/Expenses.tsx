@@ -89,7 +89,8 @@ const Expenses = () => {
     let query = supabase
       .from("expenses")
       .select("*")
-      .eq("user_id", user?.id);
+      .eq("user_id", user?.id)
+      .order("date", { ascending: false });
 
     if (startDate) {
       query = query.gte('date', startDate);
@@ -97,11 +98,8 @@ const Expenses = () => {
     if (endDate) {
       query = query.lte('date', endDate);
     }
-    if (vehicleFilter) {
-      query = query.eq('vehicle_id', vehicleFilter);
-    }
 
-    const { data, error } = await query.order("date", { ascending: false });
+    const { data, error } = await query;
 
     if (error) {
       devLog.error('Error fetching expenses:', error);
@@ -111,7 +109,11 @@ const Expenses = () => {
         variant: "destructive",
       });
     } else {
-      setExpenses(data || []);
+      let filteredData = data || [];
+      if (vehicleFilter) {
+        filteredData = filteredData.filter((e: any) => e.vehicle_id === vehicleFilter);
+      }
+      setExpenses(filteredData);
     }
     setLoading(false);
   };

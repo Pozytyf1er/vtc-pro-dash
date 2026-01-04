@@ -19,6 +19,7 @@ import MyStats from "./pages/MyStats";
 import Profitability from "./pages/Profitability";
 import Settings from "./pages/Settings";
 import DriverDashboard from "./pages/DriverDashboard";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +33,7 @@ const App = () => (
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/install" element={<Install />} />
             <Route
               path="/"
               element={

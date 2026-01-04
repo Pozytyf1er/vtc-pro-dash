@@ -89,7 +89,8 @@ const Incomes = () => {
     let query = supabase
       .from("incomes")
       .select("*")
-      .eq("user_id", user?.id);
+      .eq("user_id", user?.id)
+      .order("date", { ascending: false });
 
     if (startDate) {
       query = query.gte('date', startDate);
@@ -97,11 +98,8 @@ const Incomes = () => {
     if (endDate) {
       query = query.lte('date', endDate);
     }
-    if (vehicleFilter) {
-      query = query.eq('vehicle_id', vehicleFilter);
-    }
 
-    const { data, error } = await query.order("date", { ascending: false });
+    const { data, error } = await query;
 
     if (error) {
       devLog.error('Error fetching incomes:', error);
@@ -111,7 +109,11 @@ const Incomes = () => {
         variant: "destructive",
       });
     } else {
-      setIncomes(data || []);
+      let filteredData = data || [];
+      if (vehicleFilter) {
+        filteredData = filteredData.filter((i: any) => i.vehicle_id === vehicleFilter);
+      }
+      setIncomes(filteredData);
     }
     setLoading(false);
   };
