@@ -1,21 +1,21 @@
 import { useEffect, useState } from "react";
-import { WifiOff, RefreshCw, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { usePendingSync } from "@/hooks/useOfflineCache";
-import { useToast } from "@/hooks/use-toast";
+import { WifiOff, RefreshCw, CheckCircle, XCircle, Cloud, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const OfflineIndicator = () => {
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [syncing, setSyncing] = useState(false);
-  const { pendingCount, syncPendingChanges } = usePendingSync();
-  const { toast } = useToast();
+  const { pendingCount, isSyncing, lastSyncResult, syncPendingChanges } = usePendingSync();
 
   useEffect(() => {
-    const handleOnline = () => {
-      setIsOffline(false);
-      // Auto-sync when coming back online
-      handleSync();
-    };
+    const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
 
     window.addEventListener("online", handleOnline);
@@ -27,60 +27,87 @@ const OfflineIndicator = () => {
     };
   }, []);
 
-  const handleSync = async () => {
-    if (pendingCount === 0) return;
-    
-    setSyncing(true);
-    try {
-      const syncedCount = await syncPendingChanges();
-      if (syncedCount && syncedCount > 0) {
-        toast({
-          title: "Synchronisation réussie",
-          description: `${syncedCount} modification(s) synchronisée(s)`,
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Erreur de synchronisation",
-        description: "Certaines modifications n'ont pas pu être synchronisées",
-        variant: "destructive",
-      });
+  // Don't show anything if online and no pending changes
+  if (!isOffline && pendingCount === 0 && !isSyncing) {
+    return null;
+  }
+
+  const handleManualSync = () => {
+    if (!isOffline && !isSyncing) {
+      syncPendingChanges();
     }
-    setSyncing(false);
   };
 
-  if (!isOffline && pendingCount === 0) return null;
-
   return (
-    <div className={`fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-lg px-4 py-2 shadow-lg ${
-      isOffline ? 'bg-warning text-warning-foreground' : 'bg-accent text-accent-foreground'
-    }`}>
+    <div
+      className={cn(
+        "fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-full px-4 py-2 shadow-lg transition-all duration-300",
+        isOffline
+          ? "bg-destructive text-destructive-foreground"
+          : isSyncing
+          ? "bg-primary text-primary-foreground"
+          : lastSyncResult === "error"
+          ? "bg-orange-500 text-white"
+          : "bg-muted text-muted-foreground"
+      )}
+    >
       {isOffline ? (
         <>
           <WifiOff className="h-4 w-4" />
           <span className="text-sm font-medium">Mode hors-ligne</span>
-          {pendingCount > 0 && (
-            <span className="text-xs">({pendingCount} en attente)</span>
-          )}
+        </>
+      ) : isSyncing ? (
+        <>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span className="text-sm font-medium">Synchronisation...</span>
+        </>
+      ) : lastSyncResult === "success" && pendingCount === 0 ? (
+        <>
+          <CheckCircle className="h-4 w-4 text-green-500" />
+          <span className="text-sm font-medium">Synchronisation terminée</span>
         </>
       ) : (
         <>
-          {syncing ? (
-            <RefreshCw className="h-4 w-4 animate-spin" />
-          ) : (
-            <Check className="h-4 w-4" />
-          )}
-          <span className="text-sm font-medium">{pendingCount} modification(s) en attente</span>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={handleSync}
-            disabled={syncing}
-            className="h-6 px-2"
-          >
-            Synchroniser
-          </Button>
+          <Cloud className="h-4 w-4" />
+          <span className="text-sm font-medium">
+            {pendingCount} modification(s) en attente
+          </span>
         </>
+      )}
+
+      {pendingCount > 0 && (
+        <Badge variant="secondary" className="ml-1">
+          {pendingCount}
+        </Badge>
+      )}
+
+      {!isOffline && pendingCount > 0 && !isSyncing && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 ml-1"
+              onClick={handleManualSync}
+            >
+              <RefreshCw className="h-3 w-3" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Synchroniser maintenant</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
+      {lastSyncResult === "error" && !isSyncing && (
+        <Tooltip>
+          <TooltipTrigger>
+            <XCircle className="h-4 w-4 text-destructive" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Échec de la synchronisation</p>
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );
