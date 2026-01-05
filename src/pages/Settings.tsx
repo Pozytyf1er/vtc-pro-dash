@@ -2,8 +2,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,8 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { User, Camera, Bell, Save, Loader2, Globe } from "lucide-react";
+import { User, Camera, Bell, Save, Loader2 } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -33,8 +30,6 @@ interface AlertSettings {
 const Settings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { language, setLanguage, t } = useLanguage();
-  const { isSupported, permission, requestPermission } = usePushNotifications();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -82,11 +77,11 @@ const Settings = () => {
 
     if (alertData) {
       setAlertSettings({
-        oil_change_alert_days: alertData.oil_change_alert_days ?? 7,
-        insurance_alert_days: alertData.insurance_alert_days ?? 30,
-        inspection_alert_days: alertData.inspection_alert_days ?? 30,
-        license_alert_days: alertData.license_alert_days ?? 30,
-        push_enabled: alertData.push_enabled ?? false,
+        oil_change_alert_days: alertData.oil_change_alert_days,
+        insurance_alert_days: alertData.insurance_alert_days,
+        inspection_alert_days: alertData.inspection_alert_days,
+        license_alert_days: alertData.license_alert_days,
+        push_enabled: alertData.push_enabled,
       });
     }
 
@@ -99,12 +94,12 @@ const Settings = () => {
 
     // Validate file
     if (!file.type.startsWith("image/")) {
-      toast({ title: t("common.error"), description: "Veuillez sélectionner une image", variant: "destructive" });
+      toast({ title: "Erreur", description: "Veuillez sélectionner une image", variant: "destructive" });
       return;
     }
 
     if (file.size > 2 * 1024 * 1024) {
-      toast({ title: t("common.error"), description: "L'image ne doit pas dépasser 2 Mo", variant: "destructive" });
+      toast({ title: "Erreur", description: "L'image ne doit pas dépasser 2 Mo", variant: "destructive" });
       return;
     }
 
@@ -134,10 +129,10 @@ const Settings = () => {
       if (updateError) throw updateError;
 
       setProfile((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : null));
-      toast({ title: t("common.success"), description: t("settings.profileUpdated") });
-    } catch (error: unknown) {
+      toast({ title: "Succès", description: "Photo de profil mise à jour" });
+    } catch (error: any) {
       console.error("Upload error:", error);
-      toast({ title: t("common.error"), description: "Impossible de télécharger l'image", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de télécharger l'image", variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -158,10 +153,10 @@ const Settings = () => {
 
       if (error) throw error;
 
-      toast({ title: t("common.success"), description: t("settings.profileUpdated") });
-    } catch (error: unknown) {
+      toast({ title: "Succès", description: "Profil mis à jour" });
+    } catch (error: any) {
       console.error("Save error:", error);
-      toast({ title: t("common.error"), description: "Impossible de sauvegarder le profil", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de sauvegarder le profil", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -181,39 +176,27 @@ const Settings = () => {
 
       if (error) throw error;
 
-      toast({ title: t("common.success"), description: t("settings.settingsUpdated") });
-    } catch (error: unknown) {
+      toast({ title: "Succès", description: "Paramètres d'alertes mis à jour" });
+    } catch (error: any) {
       console.error("Save error:", error);
-      toast({ title: t("common.error"), description: "Impossible de sauvegarder les paramètres", variant: "destructive" });
+      toast({ title: "Erreur", description: "Impossible de sauvegarder les paramètres", variant: "destructive" });
     } finally {
       setSaving(false);
     }
   };
 
-  const handlePushToggle = async (checked: boolean) => {
-    if (checked) {
-      if (!isSupported) {
-        toast({ 
-          title: t("common.error"), 
-          description: t("settings.notificationsNotSupported"), 
-          variant: "destructive" 
-        });
-        return;
-      }
+  const requestPushPermission = async () => {
+    if (!("Notification" in window)) {
+      toast({ title: "Non supporté", description: "Les notifications ne sont pas supportées sur ce navigateur", variant: "destructive" });
+      return;
+    }
 
-      const granted = await requestPermission();
-      if (granted) {
-        setAlertSettings((prev) => ({ ...prev, push_enabled: true }));
-        toast({ title: t("common.success"), description: t("settings.notificationsEnabled") });
-      } else {
-        toast({ 
-          title: t("common.error"), 
-          description: t("settings.notificationsDenied"), 
-          variant: "destructive" 
-        });
-      }
+    const permission = await Notification.requestPermission();
+    if (permission === "granted") {
+      setAlertSettings((prev) => ({ ...prev, push_enabled: true }));
+      toast({ title: "Succès", description: "Notifications activées" });
     } else {
-      setAlertSettings((prev) => ({ ...prev, push_enabled: false }));
+      toast({ title: "Refusé", description: "Permission de notification refusée", variant: "destructive" });
     }
   };
 
@@ -234,40 +217,18 @@ const Settings = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">{t("settings.title")}</h1>
-        <p className="text-muted-foreground">{t("settings.subtitle")}</p>
+        <h1 className="text-3xl font-bold text-foreground">Paramètres</h1>
+        <p className="text-muted-foreground">Gérez votre profil et vos préférences</p>
       </div>
-
-      {/* Language Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
-            {t("settings.language")}
-          </CardTitle>
-          <CardDescription>{t("settings.languageDesc")}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Select value={language} onValueChange={(value: "fr" | "en") => setLanguage(value)}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="fr">🇫🇷 {t("settings.french")}</SelectItem>
-              <SelectItem value="en">🇬🇧 {t("settings.english")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </CardContent>
-      </Card>
 
       {/* Profile Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            {t("settings.profile")}
+            Informations personnelles
           </CardTitle>
-          <CardDescription>{t("settings.profileDesc")}</CardDescription>
+          <CardDescription>Mettez à jour votre profil et photo</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Avatar */}
@@ -299,9 +260,9 @@ const Settings = () => {
               </label>
             </div>
             <div className="space-y-1">
-              <p className="font-medium">{t("settings.avatar")}</p>
+              <p className="font-medium">Photo de profil</p>
               <p className="text-sm text-muted-foreground">
-                {t("settings.avatarDesc")}
+                JPG, PNG ou GIF. Max 2 Mo.
               </p>
             </div>
           </div>
@@ -311,19 +272,19 @@ const Settings = () => {
           {/* Form */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="first_name">{t("auth.firstName")}</Label>
+              <Label htmlFor="first_name">Prénom</Label>
               <Input
                 id="first_name"
-                placeholder={t("auth.firstName")}
+                placeholder="Votre prénom"
                 value={formData.first_name}
                 onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="last_name">{t("auth.lastName")}</Label>
+              <Label htmlFor="last_name">Nom</Label>
               <Input
                 id="last_name"
-                placeholder={t("auth.lastName")}
+                placeholder="Votre nom"
                 value={formData.last_name}
                 onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
               />
@@ -331,14 +292,14 @@ const Settings = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>{t("auth.email")}</Label>
+            <Label>Email</Label>
             <Input value={user?.email || ""} disabled className="bg-muted" />
-            <p className="text-xs text-muted-foreground">{t("settings.emailNotEditable")}</p>
+            <p className="text-xs text-muted-foreground">L'email ne peut pas être modifié</p>
           </div>
 
           <Button onClick={handleSaveProfile} disabled={saving}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {t("settings.saveProfile")}
+            Enregistrer le profil
           </Button>
         </CardContent>
       </Card>
@@ -348,28 +309,28 @@ const Settings = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Bell className="h-5 w-5" />
-            {t("settings.alerts")}
+            Paramètres d'alertes
           </CardTitle>
-          <CardDescription>{t("settings.alertsDesc")}</CardDescription>
+          <CardDescription>Configurez quand recevoir des alertes pour les échéances</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Push notifications */}
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label>{t("settings.pushNotifications")}</Label>
+              <Label>Notifications push</Label>
               <p className="text-sm text-muted-foreground">
-                {t("settings.pushDesc")}
+                Recevoir des notifications dans le navigateur
               </p>
-              {permission === "denied" && (
-                <p className="text-xs text-destructive">
-                  {t("settings.notificationsDenied")}
-                </p>
-              )}
             </div>
             <Switch
-              checked={alertSettings.push_enabled && permission === "granted"}
-              onCheckedChange={handlePushToggle}
-              disabled={permission === "denied"}
+              checked={alertSettings.push_enabled}
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  requestPushPermission();
+                } else {
+                  setAlertSettings((prev) => ({ ...prev, push_enabled: false }));
+                }
+              }}
             />
           </div>
 
@@ -377,7 +338,7 @@ const Settings = () => {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="oil_days">{t("settings.oilAlert")}</Label>
+              <Label htmlFor="oil_days">Alerte vidange (jours avant)</Label>
               <Input
                 id="oil_days"
                 type="number"
@@ -390,7 +351,7 @@ const Settings = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="insurance_days">{t("settings.insuranceAlert")}</Label>
+              <Label htmlFor="insurance_days">Alerte assurance (jours avant)</Label>
               <Input
                 id="insurance_days"
                 type="number"
@@ -403,7 +364,7 @@ const Settings = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inspection_days">{t("settings.inspectionAlert")}</Label>
+              <Label htmlFor="inspection_days">Alerte contrôle technique (jours avant)</Label>
               <Input
                 id="inspection_days"
                 type="number"
@@ -416,7 +377,7 @@ const Settings = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="license_days">{t("settings.licenseAlert")}</Label>
+              <Label htmlFor="license_days">Alerte permis (jours avant)</Label>
               <Input
                 id="license_days"
                 type="number"
@@ -432,7 +393,7 @@ const Settings = () => {
 
           <Button onClick={handleSaveAlertSettings} disabled={saving}>
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {t("settings.saveSettings")}
+            Enregistrer les paramètres
           </Button>
         </CardContent>
       </Card>

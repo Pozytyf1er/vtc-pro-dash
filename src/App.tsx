@@ -4,10 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
-import { LanguageProvider } from "@/lib/i18n/LanguageContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Layout from "@/components/Layout";
-import OfflineIndicator from "@/components/OfflineIndicator";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Incomes from "./pages/Incomes";
@@ -28,12 +26,10 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <LanguageProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <OfflineIndicator />
-        <BrowserRouter>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
         <AuthProvider>
           <Routes>
             <Route path="/auth" element={<Auth />} />
@@ -161,10 +157,9 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-          </AuthProvider>
-        </BrowserRouter>
-      </TooltipProvider>
-    </LanguageProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

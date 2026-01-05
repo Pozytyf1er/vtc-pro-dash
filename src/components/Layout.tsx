@@ -1,17 +1,13 @@
-import { ReactNode, useEffect } from "react";
+import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useUserRole } from "@/hooks/useUserRole";
-import { useLanguage } from "@/lib/i18n/LanguageContext";
-import { useAlerts } from "@/hooks/useAlerts";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { Button } from "@/components/ui/button";
 import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart, Settings, UserCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertsBanner } from "@/components/AlertsBanner";
-import { LanguageSelector } from "@/components/LanguageSelector";
 import OfflineIndicator from "@/components/OfflineIndicator";
 
 interface LayoutProps {
@@ -23,18 +19,8 @@ const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const { signOut } = useAuth();
   const { isAdmin, isDriver, role } = useUserRole();
-  const { t } = useLanguage();
-  const { alerts } = useAlerts();
-  const { sendAlertNotifications, permission } = usePushNotifications();
   const isMobile = useIsMobile();
   const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  // Send push notifications for critical alerts
-  useEffect(() => {
-    if (permission === "granted" && alerts.length > 0) {
-      sendAlertNotifications(alerts);
-    }
-  }, [alerts, permission, sendAlertNotifications]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
@@ -53,19 +39,19 @@ const Layout = ({ children }: LayoutProps) => {
 
   // Menu items - original menu for all users
   const baseMenuItems = [
-    { icon: BarChart3, label: t("nav.dashboard"), path: "/" },
-    { icon: TrendingUp, label: t("nav.incomes"), path: "/incomes" },
-    { icon: TrendingDown, label: t("nav.expenses"), path: "/expenses" },
-    { icon: Car, label: t("nav.vehicles"), path: "/vehicle" },
-    { icon: Users, label: t("nav.drivers"), path: "/drivers" },
-    { icon: Wrench, label: t("nav.maintenance"), path: "/maintenance" },
+    { icon: BarChart3, label: "Tableau de bord", path: "/" },
+    { icon: TrendingUp, label: "Recettes", path: "/incomes" },
+    { icon: TrendingDown, label: "Dépenses", path: "/expenses" },
+    { icon: Car, label: "Véhicules", path: "/vehicle" },
+    { icon: Users, label: "Conducteurs", path: "/drivers" },
+    { icon: Wrench, label: "Maintenance", path: "/maintenance" },
   ];
 
   // Additional menu items for new features
   const additionalItems = [
-    { icon: Timer, label: t("nav.shifts"), path: "/shifts" },
-    { icon: UserCircle, label: t("nav.dashboard"), path: "/driver-dashboard" },
-    { icon: PieChart, label: t("nav.profitability"), path: "/profitability", adminOnly: true },
+    { icon: Timer, label: "Shifts", path: "/shifts" },
+    { icon: UserCircle, label: "Mon tableau de bord", path: "/driver-dashboard" },
+    { icon: PieChart, label: "Rentabilité", path: "/profitability", adminOnly: true },
   ];
 
   // Combine all items, filtering admin-only if not admin
@@ -102,7 +88,7 @@ const Layout = ({ children }: LayoutProps) => {
           onClick={() => navigate("/settings")}
         >
           <Settings className="h-5 w-5" />
-          {t("nav.settings")}
+          Paramètres
         </Button>
         <Button
           variant="ghost"
@@ -118,7 +104,7 @@ const Layout = ({ children }: LayoutProps) => {
           onClick={signOut}
         >
           <LogOut className="h-5 w-5" />
-          {t("nav.logout")}
+          Déconnexion
         </Button>
       </div>
     </>
@@ -166,8 +152,7 @@ const Layout = ({ children }: LayoutProps) => {
       <main className={`flex-1 ${!isMobile ? "ml-64" : "mt-14"}`}>
         {/* Desktop top bar with alerts */}
         {!isMobile && (
-          <div className="sticky top-0 z-30 flex items-center justify-end gap-2 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3">
-            <LanguageSelector />
+          <div className="sticky top-0 z-30 flex justify-end border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3">
             <AlertsBanner />
           </div>
         )}
