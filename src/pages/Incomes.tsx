@@ -32,6 +32,15 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { incomeSchema, getValidationErrors, devLog } from "@/lib/validations";
+import { useTranslation } from "react-i18next";
+import { ExportButtons } from "@/components/ExportButtons";
+import { 
+  exportToPDF, 
+  exportToCSV, 
+  formatIncomeForExport, 
+  getDateRangeForPeriod,
+  type PeriodFilter 
+} from "@/lib/exportUtils";
 
 interface Income {
   id: string;
@@ -51,6 +60,7 @@ interface Vehicle {
 const Incomes = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +69,7 @@ const Incomes = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('month');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -68,6 +79,15 @@ const Incomes = () => {
     notes: "",
     vehicle_id: "",
   });
+
+  // Set initial dates based on period
+  useEffect(() => {
+    if (periodFilter !== 'custom') {
+      const range = getDateRangeForPeriod(periodFilter);
+      setStartDate(format(range.start, 'yyyy-MM-dd'));
+      setEndDate(format(range.end, 'yyyy-MM-dd'));
+    }
+  }, [periodFilter]);
 
   useEffect(() => {
     fetchVehicles();
@@ -247,25 +267,43 @@ const Incomes = () => {
     );
   }
 
+  const handleExportPDF = () => {
+    const range = getDateRangeForPeriod(periodFilter, startDate, endDate);
+    const data = formatIncomeForExport(incomes, vehicles, range);
+    exportToPDF(data, `recettes_${format(new Date(), 'yyyy-MM-dd')}`);
+  };
+
+  const handleExportCSV = () => {
+    const range = getDateRangeForPeriod(periodFilter, startDate, endDate);
+    const data = formatIncomeForExport(incomes, vehicles, range);
+    exportToCSV(data, `recettes_${format(new Date(), 'yyyy-MM-dd')}`);
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Recettes</h1>
-          <p className="text-muted-foreground">Gérez vos recettes de courses</p>
+          <h1 className="text-3xl font-bold text-foreground">{t('incomes.title')}</h1>
+          <p className="text-muted-foreground">{t('incomes.subtitle')}</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => { setEditingIncome(null); setErrors([]); }}>
-              <Plus className="mr-2 h-4 w-4" />
-              Ajouter une recette
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                {editingIncome ? "Modifier la recette" : "Nouvelle recette"}
-              </DialogTitle>
+        <div className="flex items-center gap-2">
+          <ExportButtons 
+            onExportPDF={handleExportPDF}
+            onExportCSV={handleExportCSV}
+            disabled={incomes.length === 0}
+          />
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button onClick={() => { setEditingIncome(null); setErrors([]); }}>
+                <Plus className="mr-2 h-4 w-4" />
+                {t('incomes.addIncome')}
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>
+                  {editingIncome ? t('incomes.editIncome') : t('incomes.newIncome')}
+                </DialogTitle>
             </DialogHeader>
             {errors.length > 0 && (
               <div className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive">
@@ -365,43 +403,68 @@ const Incomes = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Filtres</CardTitle>
+          <CardTitle>{t('common.filters')}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
-              <Label htmlFor="startDate">Date de début</Label>
+              <Label>{t('common.period')}</Label>
+              <Select
+                value={periodFilter}
+                onValueChange={(value) => setPeriodFilter(value as PeriodFilter)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today">{t('common.today')}</SelectItem>
+                  <SelectItem value="week">{t('common.thisWeek')}</SelectItem>
+                  <SelectItem value="month">{t('common.thisMonth')}</SelectItem>
+                  <SelectItem value="year">{t('common.thisYear')}</SelectItem>
+                  <SelectItem value="custom">{t('common.custom')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="startDate">{t('common.startDate')}</Label>
               <Input
                 id="startDate"
                 type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPeriodFilter('custom');
+                }}
               />
             </div>
             <div>
-              <Label htmlFor="endDate">Date de fin</Label>
+              <Label htmlFor="endDate">{t('common.endDate')}</Label>
               <Input
                 id="endDate"
                 type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPeriodFilter('custom');
+                }}
               />
             </div>
             <div>
-              <Label htmlFor="vehicleFilter">Véhicule</Label>
+              <Label htmlFor="vehicleFilter">{t('common.vehicle')}</Label>
               <Select
                 value={vehicleFilter || "all"}
                 onValueChange={(value) => setVehicleFilter(value === "all" ? "" : value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Tous les véhicules" />
+                  <SelectValue placeholder={t('common.allVehicles')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous les véhicules</SelectItem>
+                  <SelectItem value="all">{t('common.allVehicles')}</SelectItem>
                   {vehicles.map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id}>
                       {vehicle.model} - {vehicle.plate_number}
@@ -414,12 +477,11 @@ const Incomes = () => {
               <Button
                 variant="outline"
                 onClick={() => {
-                  setStartDate('');
-                  setEndDate('');
+                  setPeriodFilter('month');
                   setVehicleFilter('');
                 }}
               >
-                Réinitialiser
+                {t('common.reset')}
               </Button>
             </div>
           </div>

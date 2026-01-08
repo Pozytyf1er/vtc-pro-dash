@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { User, Camera, Bell, Save, Loader2 } from "lucide-react";
+import { User, Camera, Bell, Save, Loader2, Globe } from "lucide-react";
+import { LanguageSelector } from "@/components/LanguageSelector";
+import { useTranslation } from "react-i18next";
 
 interface Profile {
   id: string;
@@ -395,6 +397,20 @@ const Settings = () => {
             {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Enregistrer les paramètres
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Language Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Langue
+          </CardTitle>
+          <CardDescription>Choisissez la langue de l'application</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <LanguageSelector />
         </CardContent>
       </Card>
     </div>
