@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,8 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Car } from "lucide-react";
 import { signInSchema, signUpSchema, getValidationErrors } from "@/lib/validations";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
 const Auth = () => {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -42,14 +45,14 @@ const Auth = () => {
 
     if (error) {
       toast({
-        title: "Erreur de connexion",
+        title: t('auth.loginError'),
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Connexion réussie",
-        description: "Bienvenue dans VTC Manager !",
+        title: t('auth.loginSuccess'),
+        description: t('auth.welcomeMessage'),
       });
       navigate("/");
     }
@@ -72,14 +75,14 @@ const Auth = () => {
 
     if (error) {
       toast({
-        title: "Erreur d'inscription",
+        title: t('auth.signupError'),
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: "Inscription réussie",
-        description: "Votre compte a été créé avec succès !",
+        title: t('auth.signupSuccess'),
+        description: t('auth.accountCreated'),
       });
       navigate("/");
     }
@@ -89,13 +92,18 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
+      {/* Language toggle in top right corner */}
+      <div className="absolute top-4 right-4">
+        <LanguageToggle />
+      </div>
+
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary">
             <Car className="h-8 w-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-3xl font-bold">VTC Manager</CardTitle>
-          <CardDescription>Gérez votre activité VTC en toute simplicité</CardDescription>
+          <CardDescription>{t('auth.appDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           {errors.length > 0 && (
@@ -109,36 +117,36 @@ const Auth = () => {
           )}
           <Tabs defaultValue="signin" className="w-full" onValueChange={() => setErrors([])}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">Connexion</TabsTrigger>
-              <TabsTrigger value="signup">Inscription</TabsTrigger>
+              <TabsTrigger value="signin">{t('auth.login')}</TabsTrigger>
+              <TabsTrigger value="signup">{t('auth.signup')}</TabsTrigger>
             </TabsList>
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t('auth.email')}</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder="votre@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Mot de passe</Label>
+                  <Label htmlFor="password">{t('auth.password')}</Label>
                   <Input
                     id="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder={t('auth.passwordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">Minimum 8 caractères</p>
+                  <p className="text-xs text-muted-foreground">{t('auth.passwordHint')}</p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Connexion..." : "Se connecter"}
+                  {loading ? t('auth.loggingIn') : t('auth.loginTitle')}
                 </Button>
               </form>
             </TabsContent>
@@ -146,7 +154,7 @@ const Auth = () => {
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">Prénom</Label>
+                    <Label htmlFor="firstName">{t('auth.firstName')}</Label>
                     <Input
                       id="firstName"
                       type="text"
@@ -156,7 +164,7 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">Nom</Label>
+                    <Label htmlFor="lastName">{t('auth.lastName')}</Label>
                     <Input
                       id="lastName"
                       type="text"
@@ -167,32 +175,32 @@ const Auth = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">Email</Label>
+                  <Label htmlFor="signup-email">{t('auth.email')}</Label>
                   <Input
                     id="signup-email"
                     type="email"
-                    placeholder="votre@email.com"
+                    placeholder={t('auth.emailPlaceholder')}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">Mot de passe</Label>
+                  <Label htmlFor="signup-password">{t('auth.password')}</Label>
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder={t('auth.passwordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Min. 8 caractères, 1 majuscule, 1 chiffre
+                    {t('auth.passwordHintFull')}
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? "Inscription..." : "S'inscrire"}
+                  {loading ? t('auth.signingUp') : t('auth.signupTitle')}
                 </Button>
               </form>
             </TabsContent>
