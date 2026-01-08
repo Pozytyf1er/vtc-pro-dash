@@ -32,6 +32,15 @@ import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { expenseSchema, getValidationErrors, devLog } from "@/lib/validations";
+import { useTranslation } from "react-i18next";
+import { ExportButtons } from "@/components/ExportButtons";
+import { 
+  exportToPDF, 
+  exportToCSV, 
+  formatExpenseForExport, 
+  getDateRangeForPeriod,
+  type PeriodFilter 
+} from "@/lib/exportUtils";
 
 interface Expense {
   id: string;
@@ -51,6 +60,7 @@ interface Vehicle {
 const Expenses = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +69,7 @@ const Expenses = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [vehicleFilter, setVehicleFilter] = useState('');
+  const [periodFilter, setPeriodFilter] = useState<PeriodFilter>('month');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [formData, setFormData] = useState({
@@ -68,6 +79,15 @@ const Expenses = () => {
     description: "",
     vehicle_id: "",
   });
+
+  // Set initial dates based on period
+  useEffect(() => {
+    if (periodFilter !== 'custom') {
+      const range = getDateRangeForPeriod(periodFilter);
+      setStartDate(format(range.start, 'yyyy-MM-dd'));
+      setEndDate(format(range.end, 'yyyy-MM-dd'));
+    }
+  }, [periodFilter]);
 
   useEffect(() => {
     fetchVehicles();
