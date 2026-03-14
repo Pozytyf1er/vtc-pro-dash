@@ -19,6 +19,7 @@ import MyStats from "./pages/MyStats";
 import Profitability from "./pages/Profitability";
 import Settings from "./pages/Settings";
 import DriverDashboard from "./pages/DriverDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 
@@ -150,6 +151,16 @@ const App = () => (
                 <ProtectedRoute>
                   <Layout>
                     <DriverDashboard />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <AdminDashboard />
                   </Layout>
                 </ProtectedRoute>
               }
