@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Car, Users, TrendingUp, TrendingDown, DollarSign, Fuel, Wrench, AlertTriangle } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { format, startOfMonth, subMonths } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Car, Users, TrendingUp, TrendingDown, DollarSign, AlertTriangle, Filter } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { format, startOfMonth, startOfWeek, subMonths, subWeeks, startOfYear } from "date-fns";
 import { fr, enUS } from "date-fns/locale";
 
 interface VehicleStat {
@@ -36,19 +37,33 @@ const AdminDashboard = () => {
   const locale = i18n.language === "fr" ? fr : enUS;
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState("month");
   const [totals, setTotals] = useState({ revenue: 0, expenses: 0, profit: 0, vehicles: 0, drivers: 0, shifts: 0 });
   const [vehicleStats, setVehicleStats] = useState<VehicleStat[]>([]);
   const [driverStats, setDriverStats] = useState<DriverStat[]>([]);
   const [revenueByVehicle, setRevenueByVehicle] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<{ type: string; message: string }[]>([]);
 
+  const getStartDate = (p: string): Date => {
+    const now = new Date();
+    switch (p) {
+      case "week": return startOfWeek(now, { weekStartsOn: 1 });
+      case "month": return startOfMonth(now);
+      case "quarter": return subMonths(startOfMonth(now), 2);
+      case "year": return startOfYear(now);
+      default: return startOfMonth(now);
+    }
+  };
+
   useEffect(() => {
     if (user) fetchAll();
-  }, [user]);
+  }, [user, period]);
 
   const fetchAll = async () => {
-    const threeMonthsAgo = subMonths(new Date(), 3);
-    const monthStart = startOfMonth(new Date());
+    setLoading(true);
+    const startDate = getStartDate(period);
+    const startDateStr = format(startDate, "yyyy-MM-dd");
+    const monthsInPeriod = Math.max(1, Math.ceil((Date.now() - startDate.getTime()) / (30 * 86400000)));
 
     const [
       { data: vehicles },
@@ -60,10 +75,10 @@ const AdminDashboard = () => {
     ] = await Promise.all([
       supabase.from("vehicles").select("*"),
       supabase.from("drivers").select("*"),
-      supabase.from("shifts").select("*").gte("created_at", threeMonthsAgo.toISOString()),
-      supabase.from("incomes").select("*").gte("date", format(monthStart, "yyyy-MM-dd")),
-      supabase.from("expenses").select("*").gte("date", format(monthStart, "yyyy-MM-dd")),
-      supabase.from("maintenance").select("*").gte("date", format(threeMonthsAgo, "yyyy-MM-dd")),
+      supabase.from("shifts").select("*").gte("created_at", startDate.toISOString()),
+      supabase.from("incomes").select("*").gte("date", startDateStr),
+      supabase.from("expenses").select("*").gte("date", startDateStr),
+      supabase.from("maintenance").select("*").gte("date", startDateStr),
     ]);
 
     const totalRevenue = (incomes || []).reduce((s, i) => s + Number(i.amount), 0);
@@ -78,34 +93,28 @@ const AdminDashboard = () => {
       shifts: (shifts || []).filter(s => s.status === "completed").length,
     });
 
-    // Vehicle stats
     const vStats: VehicleStat[] = (vehicles || []).map(v => {
       const vShifts = (shifts || []).filter(s => s.vehicle_id === v.id && s.status === "completed");
       const revenue = vShifts.reduce((s, sh) => s + Number(sh.total_revenue || 0), 0);
       const fuelCost = vShifts.reduce((s, sh) => s + Number(sh.fuel_cost || 0), 0);
       const maint = (maintenance || []).filter(m => m.vehicle_id === v.id).reduce((s, m) => s + Number(m.cost || 0), 0);
-      const monthly = (Number(v.monthly_insurance_cost || 0) + Number(v.monthly_lease_cost || 0)) * 3;
+      const monthly = (Number(v.monthly_insurance_cost || 0) + Number(v.monthly_lease_cost || 0)) * monthsInPeriod;
       const totalExp = fuelCost + maint + monthly;
       const km = vShifts.reduce((s, sh) => s + Math.max(0, (sh.end_mileage || 0) - (sh.start_mileage || 0)), 0);
       return { id: v.id, model: v.model, plateNumber: v.plate_number, revenue, expenses: totalExp, profit: revenue - totalExp, shifts: vShifts.length, km };
     });
     setVehicleStats(vStats.sort((a, b) => b.profit - a.profit));
-    setRevenueByVehicle(vStats.map(v => ({ name: `${v.model}`, revenue: v.revenue, expenses: v.expenses })));
+    setRevenueByVehicle(vStats.map(v => ({ name: v.model, revenue: v.revenue, expenses: v.expenses })));
 
-    // Driver stats
     const dStats: DriverStat[] = (drivers || []).map(d => {
       const dShifts = (shifts || []).filter(s => s.driver_id === d.id && s.status === "completed");
       const revenue = dShifts.reduce((s, sh) => s + Number(sh.total_revenue || 0), 0);
       const fuelCost = dShifts.reduce((s, sh) => s + Number(sh.fuel_cost || 0), 0);
       const km = dShifts.reduce((s, sh) => s + Math.max(0, (sh.end_mileage || 0) - (sh.start_mileage || 0)), 0);
-      return {
-        id: d.id, firstName: d.first_name, lastName: d.last_name,
-        revenue, shifts: dShifts.length, avgPerShift: dShifts.length > 0 ? revenue / dShifts.length : 0, km, fuelCost,
-      };
+      return { id: d.id, firstName: d.first_name, lastName: d.last_name, revenue, shifts: dShifts.length, avgPerShift: dShifts.length > 0 ? revenue / dShifts.length : 0, km, fuelCost };
     });
     setDriverStats(dStats.sort((a, b) => b.revenue - a.revenue));
 
-    // Alerts
     const alertsList: { type: string; message: string }[] = [];
     (vehicles || []).forEach(v => {
       if (v.insurance_expiry) {
@@ -142,12 +151,27 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">{t("admin.title")}</h1>
-        <p className="text-muted-foreground">{t("admin.subtitle")}</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">{t("admin.title")}</h1>
+          <p className="text-muted-foreground">{t("admin.subtitle")}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">{t("admin.periodWeek")}</SelectItem>
+              <SelectItem value="month">{t("admin.periodMonth")}</SelectItem>
+              <SelectItem value="quarter">{t("admin.periodQuarter")}</SelectItem>
+              <SelectItem value="year">{t("admin.periodYear")}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
-      {/* Alerts */}
       {alerts.length > 0 && (
         <div className="space-y-2">
           {alerts.map((a, i) => (
@@ -161,7 +185,6 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -170,7 +193,6 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{totals.revenue.toLocaleString()} CFA</div>
-            <p className="text-xs text-muted-foreground">{t("admin.thisMonth")}</p>
           </CardContent>
         </Card>
         <Card>
@@ -180,7 +202,6 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">{totals.expenses.toLocaleString()} CFA</div>
-            <p className="text-xs text-muted-foreground">{t("admin.thisMonth")}</p>
           </CardContent>
         </Card>
         <Card>
@@ -217,17 +238,13 @@ const AdminDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{totals.shifts}</div>
-            <p className="text-xs text-muted-foreground">{t("admin.last3Months")}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Charts */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle>{t("admin.revenueByVehicle")}</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>{t("admin.revenueByVehicle")}</CardTitle></CardHeader>
           <CardContent>
             {revenueByVehicle.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
@@ -245,11 +262,8 @@ const AdminDashboard = () => {
             )}
           </CardContent>
         </Card>
-
         <Card>
-          <CardHeader>
-            <CardTitle>{t("admin.profitByVehicle")}</CardTitle>
-          </CardHeader>
+          <CardHeader><CardTitle>{t("admin.profitByVehicle")}</CardTitle></CardHeader>
           <CardContent>
             {vehicleStats.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
@@ -269,13 +283,9 @@ const AdminDashboard = () => {
         </Card>
       </div>
 
-      {/* Vehicle Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Car className="h-5 w-5" />
-            {t("admin.vehiclePerformance")}
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><Car className="h-5 w-5" />{t("admin.vehiclePerformance")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -301,28 +311,20 @@ const AdminDashboard = () => {
                     <td className="text-right py-3 px-2">{v.shifts}</td>
                     <td className="text-right py-3 px-2">{v.km.toLocaleString()}</td>
                     <td className="text-center py-3 px-2">
-                      <Badge variant={v.profit > 0 ? "default" : "destructive"}>
-                        {v.profit > 0 ? t("admin.profitable") : t("admin.loss")}
-                      </Badge>
+                      <Badge variant={v.profit > 0 ? "default" : "destructive"}>{v.profit > 0 ? t("admin.profitable") : t("admin.loss")}</Badge>
                     </td>
                   </tr>
                 ))}
-                {vehicleStats.length === 0 && (
-                  <tr><td colSpan={7} className="text-center py-6 text-muted-foreground">{t("common.noData")}</td></tr>
-                )}
+                {vehicleStats.length === 0 && <tr><td colSpan={7} className="text-center py-6 text-muted-foreground">{t("common.noData")}</td></tr>}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
 
-      {/* Driver Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            {t("admin.driverPerformance")}
-          </CardTitle>
+          <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" />{t("admin.driverPerformance")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
@@ -348,9 +350,7 @@ const AdminDashboard = () => {
                     <td className="text-right py-3 px-2 text-destructive">{d.fuelCost.toLocaleString()} CFA</td>
                   </tr>
                 ))}
-                {driverStats.length === 0 && (
-                  <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">{t("common.noData")}</td></tr>
-                )}
+                {driverStats.length === 0 && <tr><td colSpan={6} className="text-center py-6 text-muted-foreground">{t("common.noData")}</td></tr>}
               </tbody>
             </table>
           </div>
