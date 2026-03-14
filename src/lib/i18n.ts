@@ -733,6 +733,10 @@ const resources = {
         alertInspection: 'Inspection expires in {{days}} days - {{vehicle}}',
         alertOilChange: 'Oil change due for {{vehicle}}: {{km}} km remaining',
         alertLicense: 'License expires in {{days}} days - {{driver}}',
+        periodWeek: 'This week',
+        periodMonth: 'This month',
+        periodQuarter: 'This quarter',
+        periodYear: 'This year',
       },
       settings: {
         title: 'Settings',
