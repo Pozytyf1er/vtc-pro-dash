@@ -459,6 +459,7 @@ const resources = {
         settings: 'Settings',
         logout: 'Logout',
         myDashboard: 'My dashboard',
+        adminDashboard: 'Admin',
         darkMode: 'Dark mode',
         lightMode: 'Light mode',
       },

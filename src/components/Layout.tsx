@@ -56,6 +56,7 @@ const Layout = ({ children }: LayoutProps) => {
     { icon: Timer, label: t('nav.shifts'), path: "/shifts" },
     { icon: UserCircle, label: t('nav.myDashboard'), path: "/driver-dashboard" },
     { icon: PieChart, label: t('nav.profitability'), path: "/profitability", adminOnly: true },
+    { icon: ShieldCheck, label: t('nav.adminDashboard'), path: "/admin", adminOnly: true },
   ];
 
   // Combine all items, filtering admin-only if not admin
