@@ -347,6 +347,10 @@ const resources = {
         alertInspection: 'Contrôle technique expire dans {{days}} jours - {{vehicle}}',
         alertOilChange: 'Vidange proche pour {{vehicle}} : {{km}} km restants',
         alertLicense: 'Permis expire dans {{days}} jours - {{driver}}',
+        periodWeek: 'Cette semaine',
+        periodMonth: 'Ce mois',
+        periodQuarter: 'Ce trimestre',
+        periodYear: 'Cette année',
       },
       settings: {
         title: 'Paramètres',
