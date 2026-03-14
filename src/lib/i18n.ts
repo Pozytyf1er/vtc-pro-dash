@@ -77,6 +77,7 @@ const resources = {
         settings: 'Paramètres',
         logout: 'Déconnexion',
         myDashboard: 'Mon tableau de bord',
+        adminDashboard: 'Admin',
         darkMode: 'Mode sombre',
         lightMode: 'Mode clair',
       },
