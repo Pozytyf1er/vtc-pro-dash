@@ -347,10 +347,6 @@ const resources = {
         alertInspection: 'Contrôle technique expire dans {{days}} jours - {{vehicle}}',
         alertOilChange: 'Vidange proche pour {{vehicle}} : {{km}} km restants',
         alertLicense: 'Permis expire dans {{days}} jours - {{driver}}',
-        periodWeek: 'Cette semaine',
-        periodMonth: 'Ce mois',
-        periodQuarter: 'Ce trimestre',
-        periodYear: 'Cette année',
       },
       settings: {
         title: 'Paramètres',
@@ -733,10 +729,6 @@ const resources = {
         alertInspection: 'Inspection expires in {{days}} days - {{vehicle}}',
         alertOilChange: 'Oil change due for {{vehicle}}: {{km}} km remaining',
         alertLicense: 'License expires in {{days}} days - {{driver}}',
-        periodWeek: 'This week',
-        periodMonth: 'This month',
-        periodQuarter: 'This quarter',
-        periodYear: 'This year',
       },
       settings: {
         title: 'Settings',
