@@ -25,8 +25,13 @@ const Auth = () => {
   const navigate = useNavigate();
 
   // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
   if (user) {
-    navigate("/");
     return null;
   }
 
