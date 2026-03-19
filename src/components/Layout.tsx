@@ -1,6 +1,5 @@
 import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
@@ -10,15 +9,12 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
 import { AlertsBanner } from "@/components/AlertsBanner";
 import OfflineIndicator from "@/components/OfflineIndicator";
-import { SyncIndicator } from "@/components/SyncIndicator";
-import { LanguageToggle } from "@/components/LanguageToggle";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 const Layout = ({ children }: LayoutProps) => {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { signOut } = useAuth();
@@ -43,19 +39,19 @@ const Layout = ({ children }: LayoutProps) => {
 
   // Menu items - original menu for all users
   const baseMenuItems = [
-    { icon: BarChart3, label: t('nav.dashboard'), path: "/" },
-    { icon: TrendingUp, label: t('nav.incomes'), path: "/incomes" },
-    { icon: TrendingDown, label: t('nav.expenses'), path: "/expenses" },
-    { icon: Car, label: t('nav.vehicles'), path: "/vehicle" },
-    { icon: Users, label: t('nav.drivers'), path: "/drivers" },
-    { icon: Wrench, label: t('nav.maintenance'), path: "/maintenance" },
+    { icon: BarChart3, label: "Tableau de bord", path: "/" },
+    { icon: TrendingUp, label: "Recettes", path: "/incomes" },
+    { icon: TrendingDown, label: "Dépenses", path: "/expenses" },
+    { icon: Car, label: "Véhicules", path: "/vehicle" },
+    { icon: Users, label: "Conducteurs", path: "/drivers" },
+    { icon: Wrench, label: "Maintenance", path: "/maintenance" },
   ];
 
   // Additional menu items for new features
   const additionalItems = [
-    { icon: Timer, label: t('nav.shifts'), path: "/shifts" },
-    { icon: UserCircle, label: t('nav.myDashboard'), path: "/driver-dashboard" },
-    { icon: PieChart, label: t('nav.profitability'), path: "/profitability", adminOnly: true },
+    { icon: Timer, label: "Shifts", path: "/shifts" },
+    { icon: UserCircle, label: "Mon tableau de bord", path: "/driver-dashboard" },
+    { icon: PieChart, label: "Rentabilité", path: "/profitability", adminOnly: true },
   ];
 
   // Combine all items, filtering admin-only if not admin
@@ -92,7 +88,7 @@ const Layout = ({ children }: LayoutProps) => {
           onClick={() => navigate("/settings")}
         >
           <Settings className="h-5 w-5" />
-          {t('nav.settings')}
+          Paramètres
         </Button>
         <Button
           variant="ghost"
@@ -100,7 +96,7 @@ const Layout = ({ children }: LayoutProps) => {
           onClick={toggleTheme}
         >
           {theme === "light" ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
-          {theme === "light" ? t('nav.darkMode') : t('nav.lightMode')}
+          {theme === "light" ? "Mode sombre" : "Mode clair"}
         </Button>
         <Button
           variant="ghost"
@@ -108,7 +104,7 @@ const Layout = ({ children }: LayoutProps) => {
           onClick={signOut}
         >
           <LogOut className="h-5 w-5" />
-          {t('nav.logout')}
+          Déconnexion
         </Button>
       </div>
     </>
@@ -135,8 +131,6 @@ const Layout = ({ children }: LayoutProps) => {
             <h1 className="text-lg font-bold">VTC Manager</h1>
           </div>
           <div className="flex items-center gap-2">
-            <LanguageToggle />
-            <SyncIndicator />
             <AlertsBanner />
             <Sheet>
               <SheetTrigger asChild>
@@ -158,9 +152,7 @@ const Layout = ({ children }: LayoutProps) => {
       <main className={`flex-1 ${!isMobile ? "ml-64" : "mt-14"}`}>
         {/* Desktop top bar with alerts */}
         {!isMobile && (
-          <div className="sticky top-0 z-30 flex items-center justify-end gap-3 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3">
-            <LanguageToggle />
-            <SyncIndicator />
+          <div className="sticky top-0 z-30 flex justify-end border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3">
             <AlertsBanner />
           </div>
         )}

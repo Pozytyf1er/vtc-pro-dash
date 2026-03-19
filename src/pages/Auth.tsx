@@ -1,6 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,10 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { Car } from "lucide-react";
 import { signInSchema, signUpSchema, getValidationErrors } from "@/lib/validations";
-import { LanguageToggle } from "@/components/LanguageToggle";
 
 const Auth = () => {
-  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -25,13 +22,8 @@ const Auth = () => {
   const navigate = useNavigate();
 
   // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      navigate("/");
-    }
-  }, [user, navigate]);
-
   if (user) {
+    navigate("/");
     return null;
   }
 
@@ -50,14 +42,14 @@ const Auth = () => {
 
     if (error) {
       toast({
-        title: t('auth.loginError'),
+        title: "Erreur de connexion",
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: t('auth.loginSuccess'),
-        description: t('auth.welcomeMessage'),
+        title: "Connexion réussie",
+        description: "Bienvenue dans VTC Manager !",
       });
       navigate("/");
     }
@@ -80,14 +72,14 @@ const Auth = () => {
 
     if (error) {
       toast({
-        title: t('auth.signupError'),
+        title: "Erreur d'inscription",
         description: error.message,
         variant: "destructive",
       });
     } else {
       toast({
-        title: t('auth.signupSuccess'),
-        description: t('auth.accountCreated'),
+        title: "Inscription réussie",
+        description: "Votre compte a été créé avec succès !",
       });
       navigate("/");
     }
@@ -97,18 +89,13 @@ const Auth = () => {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-primary/5 via-background to-accent/5 p-4">
-      {/* Language toggle in top right corner */}
-      <div className="absolute top-4 right-4">
-        <LanguageToggle />
-      </div>
-
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-1 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary">
             <Car className="h-8 w-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-3xl font-bold">VTC Manager</CardTitle>
-          <CardDescription>{t('auth.appDescription')}</CardDescription>
+          <CardDescription>Gérez votre activité VTC en toute simplicité</CardDescription>
         </CardHeader>
         <CardContent>
           {errors.length > 0 && (
@@ -122,36 +109,36 @@ const Auth = () => {
           )}
           <Tabs defaultValue="signin" className="w-full" onValueChange={() => setErrors([])}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="signin">{t('auth.login')}</TabsTrigger>
-              <TabsTrigger value="signup">{t('auth.signup')}</TabsTrigger>
+              <TabsTrigger value="signin">Connexion</TabsTrigger>
+              <TabsTrigger value="signup">Inscription</TabsTrigger>
             </TabsList>
             <TabsContent value="signin">
               <form onSubmit={handleSignIn} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">{t('auth.email')}</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
-                    placeholder={t('auth.emailPlaceholder')}
+                    placeholder="votre@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">{t('auth.password')}</Label>
+                  <Label htmlFor="password">Mot de passe</Label>
                   <Input
                     id="password"
                     type="password"
-                    placeholder={t('auth.passwordPlaceholder')}
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
-                  <p className="text-xs text-muted-foreground">{t('auth.passwordHint')}</p>
+                  <p className="text-xs text-muted-foreground">Minimum 8 caractères</p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? t('auth.loggingIn') : t('auth.loginTitle')}
+                  {loading ? "Connexion..." : "Se connecter"}
                 </Button>
               </form>
             </TabsContent>
@@ -159,7 +146,7 @@ const Auth = () => {
               <form onSubmit={handleSignUp} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName">{t('auth.firstName')}</Label>
+                    <Label htmlFor="firstName">Prénom</Label>
                     <Input
                       id="firstName"
                       type="text"
@@ -169,7 +156,7 @@ const Auth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName">{t('auth.lastName')}</Label>
+                    <Label htmlFor="lastName">Nom</Label>
                     <Input
                       id="lastName"
                       type="text"
@@ -180,32 +167,32 @@ const Auth = () => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-email">{t('auth.email')}</Label>
+                  <Label htmlFor="signup-email">Email</Label>
                   <Input
                     id="signup-email"
                     type="email"
-                    placeholder={t('auth.emailPlaceholder')}
+                    placeholder="votre@email.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="signup-password">{t('auth.password')}</Label>
+                  <Label htmlFor="signup-password">Mot de passe</Label>
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder={t('auth.passwordPlaceholder')}
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    {t('auth.passwordHintFull')}
+                    Min. 8 caractères, 1 majuscule, 1 chiffre
                   </p>
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? t('auth.signingUp') : t('auth.signupTitle')}
+                  {loading ? "Inscription..." : "S'inscrire"}
                 </Button>
               </form>
             </TabsContent>
