@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "@/lib/auth";
 import { useUserRole } from "@/hooks/useUserRole";
 import { Button } from "@/components/ui/button";
-import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart, Settings, UserCircle, ShieldCheck } from "lucide-react";
+import { Car, TrendingUp, TrendingDown, Wrench, BarChart3, LogOut, Menu, Sun, Moon, Users, Timer, PieChart, Settings, UserCircle } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useState, useEffect } from "react";
@@ -56,7 +56,6 @@ const Layout = ({ children }: LayoutProps) => {
     { icon: Timer, label: t('nav.shifts'), path: "/shifts" },
     { icon: UserCircle, label: t('nav.myDashboard'), path: "/driver-dashboard" },
     { icon: PieChart, label: t('nav.profitability'), path: "/profitability", adminOnly: true },
-    { icon: ShieldCheck, label: t('nav.adminDashboard'), path: "/admin", adminOnly: true },
   ];
 
   // Combine all items, filtering admin-only if not admin
